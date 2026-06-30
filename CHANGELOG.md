@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.1.0
+## [0.1.0]
 
 Initial release — primary-source-first, always-latest documentation engine.
 
