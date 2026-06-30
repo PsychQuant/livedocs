@@ -149,7 +149,7 @@ codesign --force \
     --timestamp \
     --options runtime \
     --identifier "$BINARY_IDENTIFIER" \
-    "${CODESIGN_ENTITLEMENT_ARGS[@]}" \
+    ${CODESIGN_ENTITLEMENT_ARGS[@]+"${CODESIGN_ENTITLEMENT_ARGS[@]}"} \
     --sign "$DEVELOPER_ID" \
     "$BINARY"
 
