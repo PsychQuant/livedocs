@@ -1,0 +1,7 @@
+{
+  "livedocs": {
+    "type": "stdio",
+    "command": "${CLAUDE_PLUGIN_ROOT}/bin/livedocs-wrapper.sh",
+    "description": "LiveDocs — primary-source-first, always-latest documentation engine (llms.txt / registry / repo / OpenAPI / GraphQL / CLI)"
+  }
+}
