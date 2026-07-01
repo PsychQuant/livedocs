@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.6.0]
+
+Proactive language-runtime version detection. `introspect` gains a read-only `runtime` kind that resolves the effective language-runtime version for the current project across Python, Node/TypeScript, Go, Rust, Java, C#/.NET, and Swift. Resolution is two-layer: a universal pin parser reads cross-language declaration files (asdf `.tool-versions`, mise, idiomatic `.<lang>-version` files), and per-language depth adapters probe the active toolchain and read the manifest. The active toolchain is authoritative; declared sources are interpreted by their semantics — a constraint (`requires-python >=3.9`) or a language-mode declaration (`swift-tools-version`) is never reported as an exact version, and an unresolvable runtime returns not-resolved rather than a guessed global version. The `docs-router` skill splits version reconciliation into an eager, per-cwd-cached, silent detect phase and a lazy, only-when-relevant surface phase; defer-to-local and confirmed-install are unchanged.
+
 ## [0.5.0]
 
 ETag conditional-revalidation cache: the only thesis-safe way to be faster without becoming a stale index. An `ETagCachingHTTPClient` decorator wraps the network layer. When a URL is cached it always re-requests with `If-None-Match`, so the server decides freshness. On `304 Not Modified` it serves the cached body, skipping the re-download and re-parse of an unchanged, often large doc like an `llms.txt`; on `200` with a new `ETag` it refreshes. It deliberately ignores `max-age`, so latest stays latest and it's only cheaper when nothing changed. Sources without an `ETag` (some registry endpoints) are not cached; POSTs (GraphQL introspection) are never cached. In-memory, per session.

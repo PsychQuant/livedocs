@@ -40,7 +40,7 @@ cheaply without ever serving stale content.
 | `resolve_source` | Ranked primary sources for a library (`library`+`ecosystem` and/or `docs_url`). |
 | `fetch_docs` | Raw verbatim text of a source URL. |
 | `latest_version` | Latest released version + changelog/repo, from the registry (9 ecosystems, version pinning). |
-| `introspect` | OpenAPI / GraphQL schema, an installed CLI's `--help`, or an installed R package's version (`kind:"r-pkg"`, read-only). |
+| `introspect` | OpenAPI / GraphQL schema, an installed CLI's `--help`, an installed R package's version (`kind:"r-pkg"`), or the effective language-runtime version of the current project (`kind:"runtime"`, Python/Node/Go/Rust/Java/.NET/Swift). Read-only. |
 
 ## Architecture
 
@@ -60,9 +60,10 @@ swift build    # builds the MCP executable
 ```
 
 Status: shipped. 9-ecosystem registry resolution, version pinning, OpenAPI/GraphQL/CLI +
-installed-R introspection, ETag revalidation cache, and the `docs-router` skill (per-question
-has-local/web-only classification + version reconciliation). Signed+notarized release, marketplace
-distribution.
+installed-R + language-runtime introspection (Python/Node/Go/Rust/Java/.NET/Swift, active-toolchain
+authoritative), ETag revalidation cache, and the `docs-router` skill (per-question
+has-local/web-only classification + detect/surface version reconciliation). Signed+notarized release,
+marketplace distribution.
 
 Design boundary (what LiveDocs is and isn't for): [docs/wiki/Primary-Source-Spectrum.md](docs/wiki/Primary-Source-Spectrum.md).
 

@@ -21,35 +21,55 @@ for what's being asked?**
   **Decision flow** and answer from web-latest. **No version reconciliation, no upgrade
   prompt** — you don't "install" web docs, and you make **no** `introspect`/installed call.
 - **has-local** — the answer depends on an installed artifact: an installed package's
-  API/behavior, or an installed CLI's flags. → if the **context-aware trigger** fires, go to
-  **Version reconciliation**; otherwise fall through to web-latest.
+  API/behavior, an installed CLI's flags, or the **effective language runtime** version. → go to
+  **Version reconciliation**: **detect** (eager, cached, silent) anchors the answer to the local
+  version; **surface** an upgrade prompt only when it's relevant. A bare conceptual query with no
+  consuming project falls through to web-latest.
 
 Same tool, split per-question: "how do I configure Claude Code" = web-only;
 "what flags does the installed `claude` take" = has-local.
 
-## Version reconciliation (has-local)
+## Version reconciliation (has-local) — detect, then surface
 
-**Context-aware trigger** — reconcile only when warranted: the query is **inside a project
-that uses the package**, OR the query is **version/upgrade/debug-shaped** ("why doesn't X
-work", "should I upgrade", "does my version have Y"). A bare conceptual question with no
-consuming project → **skip the local lookup**, answer from web-latest (bounds latency+noise).
+Two phases, so reconciliation can be **proactive without being noisy**.
 
-When triggered:
-1. **Local**: `introspect{kind:"r-pkg", target:"<pkg>"}` → installed version (**READ-ONLY**;
-   R first — npm/pip/CLI to come). `resolved_env` tells you which library answered.
-2. **Latest**: `latest_version{library, ecosystem}` → web-latest.
-3. **Compare, then defer to local** — the installed version is **always the answer**; web is
-   used **only** to gate the upgrade:
-   - installed **==** latest → answer from the **installed** docs.
-   - web newer, user **declines** upgrade → answer from the **installed** docs.
-   - web newer, user **confirms** upgrade → **you** (not the MCP) run the install command
-     (`install.packages("<pkg>")` / `npm i` / `pip install -U`), then answer from the
-     now-installed docs.
-   - **Invariant**: every branch ends "answer from local". Never present web-latest docs as
-     the answer to a has-local query.
+**Detect — eager, cached, silent.** When a query is inside a project with a resolvable local
+target (installed package, CLI, or **language runtime**), resolve the local version *once* and
+silently anchor every answer to it. Cache the detect result **per project working directory**
+(key it on the relevant pin files) so you don't re-introspect on every turn. Web-latest stays
+current cheaply because `latest_version` sits behind an ETag conditional-revalidation cache —
+when nothing changed, staying up to date costs almost nothing.
 
-**Install is a confirmed mutation** — never install without **explicit user confirmation**;
-if not given, nothing is installed. The MCP stays **read-only** (it introspects, never installs).
+**Surface — lazy, only when relevant.** Prompt about *upgrading* only when the answer is
+version-sensitive OR an actual skew/error shows up ("why doesn't X work", "should I upgrade",
+"does my version have Y"). When the version gap doesn't affect the answer, stay silent — no
+upgrade prompt. A bare conceptual question with no consuming project → skip the local lookup.
+
+**Local sources:**
+1. installed **package**: `introspect{kind:"r-pkg", target:"<pkg>"}` (R; npm/pip to come) —
+   `resolved_env` says which library answered.
+2. installed **CLI**: `introspect{kind:"cli", target:"<cmd>"}`.
+3. **language runtime** (Python / Node / Go / Rust / Java / .NET / Swift):
+   `introspect{kind:"runtime", target:"<language>" or "auto"}` → the *effective* runtime version.
+   Active toolchain is authoritative; declared pins (`.python-version`, `go.mod` `go`,
+   `swift-tools-version`, …) only cross-check; a bare constraint or a language-mode declaration
+   returns **not resolved** rather than a guessed version. Anchor stdlib/syntax/API answers to
+   the effective version — a project pinned to Python 3.11 gets 3.11 answers, not 3.13.
+
+**Latest, then defer to local:**
+- `latest_version{library, ecosystem}` → web-latest (for a runtime, the language's latest release).
+- Compare — the local version is **always the answer**; web only gates the upgrade:
+  - local **==** latest → answer from local.
+  - web newer, user **declines** → answer from local.
+  - web newer, user **confirms** → **you** (not the MCP) run the install/upgrade
+    (`install.packages(...)` / `npm i` / `pip install -U` / a runtime version-manager), then
+    answer from the now-updated local.
+  - **Invariant**: every branch ends "answer from local". Never present web-latest as the
+    answer to a has-local query.
+
+**Install is a confirmed mutation** — never install or upgrade without **explicit user
+confirmation**; if not given, nothing changes. The MCP stays **read-only** (it introspects,
+never installs).
 
 ## Decision flow
 

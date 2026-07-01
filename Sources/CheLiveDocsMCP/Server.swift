@@ -79,14 +79,14 @@ final class CheLiveDocsMCPServer {
             ),
             Tool(
                 name: "introspect",
-                description: "Introspect the HIGHEST-fidelity 'what can I actually call' source that lives OUTSIDE the web: an OpenAPI/Swagger JSON spec, a GraphQL endpoint's schema, an installed CLI's --help/--version, or the LOCALLY INSTALLED version of an R package (kind=r-pkg — the 'local' half of a version check; READ-ONLY, never installs). This reads the machine/installed artifact itself, not prose about it. target = a URL (openapi/graphql), a bare command name (cli), or an R package name (r-pkg). kind defaults to auto (URL → try openapi then graphql; bare word → cli).",
+                description: "Introspect the HIGHEST-fidelity 'what can I actually call' source that lives OUTSIDE the web: an OpenAPI/Swagger JSON spec, a GraphQL endpoint's schema, an installed CLI's --help/--version, or the LOCALLY INSTALLED version of an R package (kind=r-pkg — the 'local' half of a version check; READ-ONLY, never installs). For the effective LANGUAGE-RUNTIME version of the current project (Python/Node/Go/Rust/Java/.NET/Swift), use kind=runtime with target=<language> or 'auto' — active toolchain is authoritative, declared pins cross-check, unresolved is reported honestly (READ-ONLY). This reads the machine/installed artifact itself, not prose about it. target = a URL (openapi/graphql), a bare command name (cli), or an R package name (r-pkg). kind defaults to auto (URL → try openapi then graphql; bare word → cli).",
                 inputSchema: .object([
                     "type": .string("object"),
                     "properties": .object([
                         "target": .object(["type": .string("string"), "description": .string("API base URL / GraphQL endpoint, or a CLI command name like 'gh'")]),
                         "kind": .object([
                             "type": .string("string"),
-                            "enum": .array([.string("auto"), .string("openapi"), .string("graphql"), .string("cli"), .string("r-pkg")]),
+                            "enum": .array([.string("auto"), .string("openapi"), .string("graphql"), .string("cli"), .string("r-pkg"), .string("runtime")]),
                             "description": .string("Force a mode. Default auto.")
                         ]),
                         "flag": .object(["type": .string("string"), "description": .string("CLI mode only: --help (default) or --version")])
@@ -181,6 +181,10 @@ final class CheLiveDocsMCPServer {
             return try CLIIntrospect.run(command: target, flag: flag)
         case "r-pkg":
             return encodeRInstalled(package: target)
+        case "runtime":
+            let langId = (target == "auto" || target.isEmpty) ? nil : target
+            let cwd = FileManager.default.currentDirectoryPath
+            return encodeRuntime(RuntimeIntrospect.resolve(cwd: cwd, languageId: langId), cwd: cwd)
         case "openapi":
             guard let s = await engine.introspectOpenAPI(baseURL: target) else { return #"{"note":"No OpenAPI spec found at that base."}"# }
             return encodeOpenAPI(s)
@@ -264,6 +268,35 @@ final class CheLiveDocsMCPServer {
             return jsonString(["source": "r-installed", "package": package, "ecosystem": "cran",
                                "installed_version": version, "resolved_env": libPath,
                                "note": "READ-ONLY: this is your locally installed version, not the CRAN latest."])
+        }
+    }
+
+    private func encodeRuntime(_ results: [RuntimeIntrospect.LanguageResult], cwd: String) -> String {
+        if results.isEmpty {
+            return jsonString(["source": "runtime", "cwd": cwd,
+                               "note": "No depth-adapter language detected here (pass target=<language> to force), or the language id was rejected."])
+        }
+        let arr: [[String: Any]] = results.map { r in
+            switch r.resolution {
+            case .resolved(let version, let src, let sem, let env):
+                return ["language": r.language.rawValue, "resolved": true, "effective_version": version,
+                        "source": src, "semantics": semanticsName(sem), "resolved_env": env,
+                        "note": "READ-ONLY: effective runtime version for this project; active toolchain is authoritative."]
+            case .notResolved(let reason):
+                return ["language": r.language.rawValue, "resolved": false, "effective_version": NSNull(),
+                        "note": "Not resolved (not fabricating a version): \(reason)"]
+            }
+        }
+        return jsonString(["source": "runtime", "cwd": cwd, "runtimes": arr])
+    }
+
+    private func semanticsName(_ s: PinSemantics) -> String {
+        switch s {
+        case .activeToolchain: return "active-toolchain"
+        case .exactVersion:    return "exact-version"
+        case .directive:       return "directive"
+        case .constraint:      return "constraint"
+        case .languageMode:    return "language-mode"
         }
     }
 
