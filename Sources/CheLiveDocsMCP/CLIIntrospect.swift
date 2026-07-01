@@ -1,4 +1,5 @@
 import Foundation
+import LiveDocsCore
 
 enum CLIIntrospectError: Error, LocalizedError {
     case invalidCommand(String)
@@ -32,42 +33,16 @@ enum CLIIntrospect {
     static func run(command: String, flag: String = "--help", timeout: TimeInterval = 8) throws -> String {
         guard isSafeCommand(command) else { throw CLIIntrospectError.invalidCommand(command) }
         let safeFlag = allowedFlags.contains(flag) ? flag : "--help"
-        guard let path = resolve(command) else { throw CLIIntrospectError.notFound(command) }
+        guard let path = ProcessRunner.resolveExecutable(command) else { throw CLIIntrospectError.notFound(command) }
 
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: path)
-        proc.arguments = [safeFlag]
-        let out = Pipe(), err = Pipe()
-        proc.standardOutput = out
-        proc.standardError = err
-        proc.standardInput = FileHandle.nullDevice   // never block on stdin
-        try proc.run()
+        let r = ProcessRunner.run(executable: path, arguments: [safeFlag], timeout: timeout)
+        // A hung introspection that the watchdog had to kill is an error, not a
+        // silently-truncated "result" — surface it so the caller can distinguish.
+        if r.timedOut { throw CLIIntrospectError.timedOut(command) }
 
-        // Watchdog: kill a hung introspection rather than wedging the server.
-        let killer = DispatchWorkItem { if proc.isRunning { proc.terminate() } }
-        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
-        proc.waitUntilExit()
-        killer.cancel()
-
-        let stdout = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        let stderr = String(decoding: err.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        // Many CLIs print help to stderr; merge, preferring stdout.
-        let combined = [stdout, stderr].filter { !$0.isEmpty }.joined(separator: "\n")
+        // CLI help is untrusted output rendered into the transcript — strip control
+        // and ANSI escape sequences before returning.
+        let combined = TextSanitize.forModel(r.combined)
         return combined.isEmpty ? "(no output from \(command) \(safeFlag))" : combined
-    }
-
-    private static func resolve(_ command: String) -> String? {
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        proc.arguments = [command]
-        let out = Pipe()
-        proc.standardOutput = out
-        proc.standardError = FileHandle.nullDevice
-        do { try proc.run() } catch { return nil }
-        proc.waitUntilExit()
-        guard proc.terminationStatus == 0 else { return nil }
-        let path = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return path.isEmpty ? nil : path
     }
 }

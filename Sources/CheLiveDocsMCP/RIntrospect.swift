@@ -16,42 +16,12 @@ enum RIntrospect {
     /// not installed"); otherwise the parsed result.
     static func installed(package: String, timeout: TimeInterval = 12) -> RInstalledResult? {
         guard let args = rInstalledProbeArgs(package: package) else { return .malformed }
-        guard let rscript = resolveRscript() else { return nil }   // R toolchain absent
+        guard let rscript = ProcessRunner.resolveExecutable("Rscript") else { return nil }   // R toolchain absent
 
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: rscript)
-        proc.arguments = args
-        let out = Pipe(), err = Pipe()
-        proc.standardOutput = out
-        proc.standardError = err
-        proc.standardInput = FileHandle.nullDevice
-        do { try proc.run() } catch { return .malformed }
-
-        let killer = DispatchWorkItem { if proc.isRunning { proc.terminate() } }
-        DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
-        proc.waitUntilExit()
-        killer.cancel()
-
-        let stdout = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        return parseRPackageVersion(stdout)
-    }
-
-    private static func resolveRscript() -> String? {
-        let fm = FileManager.default
-        for p in ["/usr/local/bin/Rscript", "/opt/homebrew/bin/Rscript", "/usr/bin/Rscript"]
-        where fm.isExecutableFile(atPath: p) { return p }
-        // Fall back to PATH resolution via `which` (no shell).
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        proc.arguments = ["Rscript"]
-        let out = Pipe()
-        proc.standardOutput = out
-        proc.standardError = FileHandle.nullDevice
-        do { try proc.run() } catch { return nil }
-        proc.waitUntilExit()
-        guard proc.terminationStatus == 0 else { return nil }
-        let path = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return path.isEmpty ? nil : path
+        let r = ProcessRunner.run(executable: rscript, arguments: args, timeout: timeout)
+        guard r.launched else { return .malformed }
+        // A killed/hung probe or a non-zero exit isn't a trustworthy reading.
+        if r.timedOut { return .malformed }
+        return parseRPackageVersion(r.stdout)
     }
 }

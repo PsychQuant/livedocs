@@ -56,15 +56,22 @@ if $NEED_DOWNLOAD; then
     echo "$BINARY_NAME: $REASON — downloading from $REPO..." >&2
     mkdir -p "$INSTALL_DIR"
 
-    # Try pinned tag first, then fall back to latest release.
+    # Try pinned tag first, then fall back to latest release. Capture the
+    # matching .sha256 sidecar asset URL from the SAME release payload so the
+    # download can be integrity-checked before it's installed.
     URL=""
+    SHA_URL=""
     for API_URL in \
         "${DESIRED_VERSION:+https://api.github.com/repos/$REPO/releases/tags/v$DESIRED_VERSION}" \
         "https://api.github.com/repos/$REPO/releases/latest"
     do
         [[ -z "$API_URL" ]] && continue
-        URL=$(curl -sL --max-time 30 "$API_URL" 2>/dev/null \
+        RELEASE_JSON=$(curl -sL --max-time 30 "$API_URL" 2>/dev/null)
+        URL=$(echo "$RELEASE_JSON" \
             | grep '"browser_download_url"' | grep "/$BINARY_NAME\"" | head -1 \
+            | sed 's/.*"\(https[^"]*\)".*/\1/')
+        SHA_URL=$(echo "$RELEASE_JSON" \
+            | grep '"browser_download_url"' | grep "/$BINARY_NAME.sha256\"" | head -1 \
             | sed 's/.*"\(https[^"]*\)".*/\1/')
         [[ -n "$URL" ]] && break
     done
@@ -78,6 +85,36 @@ if $NEED_DOWNLOAD; then
         fi
     else
         if curl -sL --max-time 300 "$URL" -o "${BINARY}.tmp" 2>/dev/null; then
+            # Integrity check: verify the download against the published .sha256
+            # sidecar before installing. A truncated / tampered / MITM'd binary
+            # must never be chmod'd and exec'd. If the sidecar is unavailable we
+            # skip verification (older releases predate it) but say so.
+            SHA_OK=true
+            if [[ -n "$SHA_URL" ]]; then
+                EXPECTED=$(curl -sL --max-time 30 "$SHA_URL" 2>/dev/null | tr -d '[:space:]' | cut -d' ' -f1)
+                if [[ -n "$EXPECTED" ]]; then
+                    ACTUAL=$(shasum -a 256 "${BINARY}.tmp" 2>/dev/null | cut -d' ' -f1)
+                    if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+                        SHA_OK=false
+                        echo "$BINARY_NAME: ERROR — sha256 mismatch (expected ${EXPECTED:0:12}…, got ${ACTUAL:0:12}…); discarding download." >&2
+                    fi
+                else
+                    echo "$BINARY_NAME: WARNING — could not read published sha256; installing without integrity check." >&2
+                fi
+            else
+                echo "$BINARY_NAME: WARNING — no .sha256 asset in release; installing without integrity check." >&2
+            fi
+
+            if ! $SHA_OK; then
+                rm -f "${BINARY}.tmp" 2>/dev/null
+                if [[ -x "$BINARY" ]]; then
+                    echo "$BINARY_NAME: keeping existing verified binary." >&2
+                    exec "$BINARY" "$@"
+                fi
+                echo "$BINARY_NAME: ERROR — no verified binary available." >&2
+                exit 1
+            fi
+
             chmod +x "${BINARY}.tmp"
             mv "${BINARY}.tmp" "$BINARY"
             # Sidecar records the ACTUAL downloaded binary tag, parsed from

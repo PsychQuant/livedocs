@@ -5,12 +5,12 @@
   },
   "metadata": {
     "description": "Primary-source-first, always-latest documentation tooling. Home of the LiveDocs engine and (future) long-tail per-source adapters.",
-    "version": "0.6.0"
+    "version": "0.7.0"
   },
   "plugins": [
     {
       "name": "livedocs",
-      "version": "0.6.0",
+      "version": "0.7.0",
       "description": "Always-latest docs engine — auto-discovers llms.txt / package registry / repo / OpenAPI / GraphQL / CLI and reads them live and raw. High-fidelity alternative to pre-built docs indexes. 4 tools + a docs-router skill.",
       "author": {
         "name": "Che Cheng"

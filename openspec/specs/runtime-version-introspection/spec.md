@@ -2,7 +2,11 @@
 
 ## Purpose
 
-TBD - created by archiving change 'add-proactive-runtime-version-detection'. Update Purpose after archive.
+Resolve the effective language-runtime version a project actually runs on, so
+documentation answers are anchored to that version rather than the language's
+latest release. Resolution is read-only and honest: the active toolchain is
+authoritative, declared sources cross-check by their semantics, and an
+undeterminable runtime is reported as not-resolved instead of a guessed version.
 
 ## Requirements
 

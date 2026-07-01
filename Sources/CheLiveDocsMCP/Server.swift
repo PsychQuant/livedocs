@@ -16,7 +16,7 @@ final class CheLiveDocsMCPServer {
         self.tools = Self.defineTools()
         self.server = Server(
             name: "che-livedocs-mcp",
-            version: "0.5.0",
+            version: LiveDocsVersion.current,
             capabilities: .init(tools: .init())
         )
         self.transport = StdioTransport()
@@ -89,7 +89,8 @@ final class CheLiveDocsMCPServer {
                             "enum": .array([.string("auto"), .string("openapi"), .string("graphql"), .string("cli"), .string("r-pkg"), .string("runtime")]),
                             "description": .string("Force a mode. Default auto.")
                         ]),
-                        "flag": .object(["type": .string("string"), "description": .string("CLI mode only: --help (default) or --version")])
+                        "flag": .object(["type": .string("string"), "description": .string("CLI mode only: --help (default) or --version")]),
+                        "path": .object(["type": .string("string"), "description": .string("runtime kind only: the project directory to resolve the effective runtime for (absolute path). Defaults to the server's current working directory — set it when the project isn't the server's launch dir (marketplace/Desktop installs, monorepos).")])
                     ]),
                     "required": .array([.string("target")])
                 ])
@@ -133,11 +134,13 @@ final class CheLiveDocsMCPServer {
 
         case "fetch_docs":
             guard let url = args["url"]?.stringValue else { throw ToolError.missing("url") }
-            let cap = args["max_bytes"]?.intValue ?? 200_000
+            // Clamp: a negative max_bytes would trap `prefix(_:)` and kill the server.
+            let cap = max(0, args["max_bytes"]?.intValue ?? 200_000)
             let raw = try await engine.fetchRaw(url: url)
-            return raw.count > cap
-                ? String(raw.prefix(cap)) + "\n\n[...truncated at \(cap) bytes; raise max_bytes for the rest]"
-                : raw
+            // Strip control/ANSI/bidi from untrusted fetched content, then truncate
+            // on a UTF-8 byte boundary (the cap is in bytes, not Characters).
+            let clean = TextSanitize.forModel(raw)
+            return TextSanitize.truncateUTF8(clean, maxBytes: cap)
 
         case "latest_version":
             guard let lib = args["library"]?.stringValue else { throw ToolError.missing("library") }
@@ -167,14 +170,16 @@ final class CheLiveDocsMCPServer {
         case "introspect":
             guard let target = args["target"]?.stringValue else { throw ToolError.missing("target") }
             let kind = args["kind"]?.stringValue ?? "auto"
-            return try await introspect(target: target, kind: kind, flag: args["flag"]?.stringValue ?? "--help")
+            return try await introspect(target: target, kind: kind,
+                                        flag: args["flag"]?.stringValue ?? "--help",
+                                        path: args["path"]?.stringValue)
 
         default:
             throw ToolError.unknownTool(name)
         }
     }
 
-    private func introspect(target: String, kind: String, flag: String) async throws -> String {
+    private func introspect(target: String, kind: String, flag: String, path: String?) async throws -> String {
         let isURL = target.contains("://")
         switch kind {
         case "cli":
@@ -183,7 +188,7 @@ final class CheLiveDocsMCPServer {
             return encodeRInstalled(package: target)
         case "runtime":
             let langId = (target == "auto" || target.isEmpty) ? nil : target
-            let cwd = FileManager.default.currentDirectoryPath
+            let cwd = try runtimeCwd(path)
             return encodeRuntime(RuntimeIntrospect.resolve(cwd: cwd, languageId: langId), cwd: cwd)
         case "openapi":
             guard let s = await engine.introspectOpenAPI(baseURL: target) else { return #"{"note":"No OpenAPI spec found at that base."}"# }
@@ -197,6 +202,18 @@ final class CheLiveDocsMCPServer {
             if let s = await engine.introspectGraphQL(endpoint: target) { return encodeGraphQL(s) }
             return #"{"note":"No OpenAPI or GraphQL schema discoverable at that URL."}"#
         }
+    }
+
+    /// Resolve the directory to introspect a runtime for. An explicit `path` must
+    /// exist and be a directory (else a clear error, rather than silently reading
+    /// the wrong place); with no path we fall back to the server's cwd.
+    private func runtimeCwd(_ path: String?) throws -> String {
+        guard let path, !path.isEmpty else { return FileManager.default.currentDirectoryPath }
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else {
+            throw ToolError.invalidPath(path)
+        }
+        return path
     }
 
     // MARK: - JSON encoding (hand-rolled to keep LiveDocsCore free of an encoding policy)
@@ -279,11 +296,11 @@ final class CheLiveDocsMCPServer {
         let arr: [[String: Any]] = results.map { r in
             switch r.resolution {
             case .resolved(let version, let src, let sem, let env):
-                return ["language": r.language.rawValue, "resolved": true, "effective_version": version,
+                return ["language": r.languageId, "resolved": true, "effective_version": version,
                         "source": src, "semantics": semanticsName(sem), "resolved_env": env,
                         "note": "READ-ONLY: effective runtime version for this project; active toolchain is authoritative."]
             case .notResolved(let reason):
-                return ["language": r.language.rawValue, "resolved": false, "effective_version": NSNull(),
+                return ["language": r.languageId, "resolved": false, "effective_version": NSNull(),
                         "note": "Not resolved (not fabricating a version): \(reason)"]
             }
         }
@@ -317,11 +334,13 @@ final class CheLiveDocsMCPServer {
 enum ToolError: Error, LocalizedError {
     case missing(String)
     case unknownTool(String)
+    case invalidPath(String)
 
     var errorDescription: String? {
         switch self {
         case .missing(let p): return "Required parameter '\(p)' is missing"
         case .unknownTool(let n): return "Unknown tool '\(n)'"
+        case .invalidPath(let p): return "path '\(p)' does not exist or is not a directory"
         }
     }
 }

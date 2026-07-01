@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: swift test
+    # macos-15 ships newer Xcodes; the swift-sdk dependency needs Swift tools 6.1+,
+    # so the older default toolchain on macos-14 can't even resolve dependencies.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select newest available Xcode (Swift 6.1+)
+        run: |
+          LATEST=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1)
+          if [ -z "$LATEST" ]; then LATEST=$(ls -d /Applications/Xcode_*.app | sort -V | tail -1); fi
+          echo "Selecting $LATEST"
+          sudo xcode-select -s "$LATEST"
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test

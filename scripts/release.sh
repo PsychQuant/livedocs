@@ -100,6 +100,25 @@ if ! grep -q "^## \[$VERSION_NO_V\]" CHANGELOG.md; then
     die "CHANGELOG.md has no entry for [$VERSION_NO_V]. add one before releasing."
 fi
 
+# Version single-source must match the tag (guards the drift this replaced:
+# Server/mcpb once shipped 0.5.0 while the plugin said 0.6.0).
+SRC_VERSION=$(grep -oE 'current = "[0-9]+\.[0-9]+\.[0-9]+"' Sources/LiveDocsCore/Version.swift | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+if [[ "$SRC_VERSION" != "$VERSION_NO_V" ]]; then
+    die "LiveDocsVersion.current ('$SRC_VERSION') != release tag ($VERSION_NO_V).
+        Update Sources/LiveDocsCore/Version.swift to match the tag before releasing."
+fi
+
+# Manifests must match too (mcpb / plugin / marketplace).
+for mf in mcpb/manifest.json plugins/livedocs/.claude-plugin/plugin.json .claude-plugin/marketplace.json; do
+    if [[ -f "$mf" ]] && ! grep -q "\"$VERSION_NO_V\"" "$mf"; then
+        die "$mf does not reference version $VERSION_NO_V. bump it before releasing."
+    fi
+done
+
+# Tests must pass before we build/sign/notarize a release (issue #5).
+info "Running swift test..."
+swift test || die "swift test failed — refusing to release."
+
 info "Sanity checks passed."
 
 # ---- Extract release notes ---------------------------------------------------

@@ -173,4 +173,52 @@ final class RuntimeIntrospectionTests: XCTestCase {
         XCTAssertFalse(isSafeLanguageId("../evil"))
         XCTAssertFalse(isSafeLanguageId(""))
     }
+
+    // MARK: - Parser hardening (issues #8, #10)
+
+    func testMiseTomlStripsInlineComment() {
+        let m = parseMiseToml("""
+        [tools]
+        python = "3.11.4" # main runtime
+        node = '20.1.0'
+        """)
+        XCTAssertEqual(m["python"], "3.11.4")
+        XCTAssertEqual(m["node"], "20.1.0")
+    }
+
+    func testMiseTomlRejectsArrayValue() {
+        let m = parseMiseToml("""
+        [tools]
+        python = ["3.11", "3.10"]
+        """)
+        XCTAssertNil(m["python"], "an array is not a single version")
+    }
+
+    func testMiseTomlHashInsideQuotesKept() {
+        // A '#' inside the quoted value is not a comment.
+        let m = parseMiseToml("""
+        [tools]
+        tool = "1.2.3#build"
+        """)
+        XCTAssertEqual(m["tool"], "1.2.3#build")
+    }
+
+    func testIdiomaticTakesFirstVersionLine() {
+        // pyenv permits multiple lines — take the first, no embedded newline.
+        XCTAssertEqual(parseIdiomaticVersionFile("3.11.4\n3.10.2"), "3.11.4")
+    }
+
+    func testIdiomaticRejectsNvmrcAlias() {
+        for alias in ["lts/gallium", "node", "stable"] {
+            XCTAssertNil(parseIdiomaticVersionFile(alias), "\(alias) is an alias, not a version")
+        }
+    }
+
+    func testIdiomaticStripsLeadingVButKeepsVersion() {
+        XCTAssertEqual(parseIdiomaticVersionFile("v18.3.1"), "18.3.1")
+    }
+
+    func testIdiomaticSkipsCommentLines() {
+        XCTAssertEqual(parseIdiomaticVersionFile("# a comment\n\n3.2.2"), "3.2.2")
+    }
 }
