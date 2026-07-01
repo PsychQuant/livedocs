@@ -16,7 +16,7 @@ final class CheLiveDocsMCPServer {
         self.tools = Self.defineTools()
         self.server = Server(
             name: "che-livedocs-mcp",
-            version: "0.3.0",
+            version: "0.4.0",
             capabilities: .init(tools: .init())
         )
         self.transport = StdioTransport()

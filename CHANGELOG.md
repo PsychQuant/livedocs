@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.4.0]
 
 **Installed-version introspection + version reconciliation** (issue #1). Handles targets that have BOTH a web-latest and a locally-installed version.
 
