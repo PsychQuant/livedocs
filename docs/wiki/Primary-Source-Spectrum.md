@@ -1,8 +1,10 @@
+> English | [繁體中文](Primary-Source-Spectrum-zh-TW)
+
 # Primary-Source Spectrum — what LiveDocs is (and isn't) for
 
-> Product-boundary source of truth. Companion to the archived change
-> `add-target-type-version-reconciliation` (2026-07-01) and its living specs
-> (`target-type-classification`, `version-reconciliation`, `installed-version-introspection`).
+Product-boundary source of truth. Companion to the archived change
+`add-target-type-version-reconciliation` and its living specs
+(`target-type-classification`, `version-reconciliation`, `installed-version-introspection`).
 
 ## Principle
 
@@ -46,10 +48,3 @@ local half. Together that is complete coverage, and neither should swallow the o
 Non-machine-readable third-party docs (PDF-only, auth-walled wiki, video, Discord) degrade to
 the repo README or nothing. This edge is shrinking as `llms.txt` adoption grows (about 88% of
 popular docs hosts shipped it as of 2026-06).
-
-## Mapping to the implementation
-
-The per-question has-local vs web-only classification and the defer-to-local invariant (rows
-1-3) became executable in change `add-target-type-version-reconciliation`. Row 4 (local/private
-code = the agent reads files) is deliberately left to the agent, not the MCP. That is the
-product boundary.

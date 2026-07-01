@@ -64,5 +64,7 @@ installed-R introspection, ETag revalidation cache, and the `docs-router` skill 
 has-local/web-only classification + version reconciliation). Signed+notarized release, marketplace
 distribution.
 
-Design boundary (what LiveDocs is and isn't for): [docs/design/primary-source-spectrum.md](docs/design/primary-source-spectrum.md).
+Design boundary (what LiveDocs is and isn't for): [docs/wiki/Primary-Source-Spectrum.md](docs/wiki/Primary-Source-Spectrum.md).
+
+Wiki: <https://github.com/PsychQuant/livedocs/wiki>, mirrored 1:1 from `docs/wiki/` via `scripts/sync-wiki.sh` (edit `docs/wiki/`, then run the script).
 Positioning (vs context7): [docs/positioning.md](docs/positioning.md).

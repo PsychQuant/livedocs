@@ -1,7 +1,7 @@
 # LiveDocs — Positioning
 
 > External-messaging source of truth. Companion to
-> [primary-source-spectrum.md](design/primary-source-spectrum.md) (the product boundary).
+> [primary-source-spectrum.md](wiki/Primary-Source-Spectrum.md) (the product boundary).
 
 ## One-liner
 
@@ -76,4 +76,4 @@ architecture explanation.
 A central shared content cache would turn LiveDocs into context7: stale, crawl infra, lost
 privacy. Speed comes from local ETag revalidation. The community effect comes from shared
 routes and adapters, never shared content. See the boundary in
-[primary-source-spectrum.md](design/primary-source-spectrum.md).
+[primary-source-spectrum.md](wiki/Primary-Source-Spectrum.md).
