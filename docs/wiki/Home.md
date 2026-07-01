@@ -28,7 +28,7 @@ Then use the `docs-router` skill; it routes questions to the right tool.
 | `resolve_source` | Ranked primary sources for a library (fidelity-first). |
 | `fetch_docs` | Raw verbatim text of a source URL. |
 | `latest_version` | Latest version + changelog/repo, from the registry (9 ecosystems: npm/pypi/crates/go/rubygems/jsr/packagist/maven/cran). Version pinning supported. |
-| `introspect` | OpenAPI / GraphQL schema, an installed CLI's `--help`, or an installed R package's version (`kind:"r-pkg"`, read-only). |
+| `introspect` | OpenAPI / GraphQL schema, an installed CLI's `--help`, an installed R package's version (`kind:"r-pkg"`), or the project's effective language-runtime version (`kind:"runtime"`, Python/Node/Go/Rust/Java/.NET/Swift). Read-only. |
 
 ## Guides
 
