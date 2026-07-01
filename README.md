@@ -24,7 +24,7 @@ source LiveDocs can read verbatim.
    (`pypi.org/pypi/<pkg>/json`): the *exact latest version* + changelog/repo/docs URLs,
    deterministically, no scraping.
 3. **Repo** — GitHub README / CHANGELOG / releases (raw).
-4. *(planned)* OpenAPI / GraphQL / CLI introspection — the highest-fidelity "can I use it" source.
+4. **Introspection** (`introspect`) — the highest-fidelity "can I actually use it" source, read directly from the machine/installed artifact: OpenAPI / GraphQL schema, an installed CLI's `--help`/`--version`, or a locally **installed R package's version** (`kind:"r-pkg"`, read-only). This is the "local" half of a version check — for targets with both a web-latest and an installed version, the `docs-router` skill reconciles them and always defers to the installed version (web only gates the upgrade).
 5. **Fallback** — context7 / web, always **labeled low-fidelity**.
 
 Results are ranked **fidelity-first, then freshness**.
@@ -55,4 +55,4 @@ swift build    # builds the MCP executable
 ```
 
 Status: **MVP** — `llms.txt` + registry + repo legs working end-to-end and verified live.
-Planned: OpenAPI/CLI introspection, router skill, `.mcpb` packaging + signed release, marketplace distribution.
+Shipped: 9-ecosystem registry resolution, version pinning, OpenAPI/GraphQL/CLI + installed-R introspection, `docs-router` skill (incl. per-question has-local/web-only classification + version reconciliation), signed+notarized release, marketplace distribution.

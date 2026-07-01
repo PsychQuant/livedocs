@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+**Installed-version introspection + version reconciliation** (issue #1). Handles targets that have BOTH a web-latest and a locally-installed version.
+
+- MCP `introspect` gains `kind:"r-pkg"` — a **READ-ONLY** probe of a locally installed R package's version via `Rscript` (name-guarded, passed as an arg not `-e`, watchdog-timed). Returns `installed_version` + the `resolved_env` (`.libPaths()` entry) it came from, or an honest "not installed in the current context" — never a fabricated global version. Never installs.
+- `docs-router` skill gains **per-question target-type classification** (`has-local` vs `web-only`) and a **version-reconciliation state machine**: for a has-local query, introspect the installed version + fetch web-latest, then **always defer to local** (web only gates the upgrade decision); a chosen upgrade is run by the skill after explicit confirmation, and the MCP stays read-only. `web-only` targets (e.g. Claude Code features/config, SaaS) skip reconciliation entirely.
+
 ## [0.3.0]
 
 **CRAN (R) registry adapter** — 9th ecosystem. `ecosystem:"cran"` resolves an R package's latest version + repo (from the CRAN `URL`/`BugReports` fields) via the crandb JSON API, feeding the same chain (e.g. `dplyr` → github.com/tidyverse/dplyr → `dplyr.tidyverse.org/llms.txt`). Turns the mechanical half of a hand-curated R docs guide into a live lookup.
