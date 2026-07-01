@@ -1,7 +1,7 @@
 {
   "name": "livedocs",
-  "version": "0.5.0",
-  "binary_version": "0.5.0",
+  "version": "0.6.0",
+  "binary_version": "0.6.0",
   "description": "Primary-source-first, always-latest documentation engine. Auto-discovers each library's canonical machine-readable source on demand — llms.txt → npm/PyPI registry → GitHub repo → OpenAPI/GraphQL/CLI introspection — and reads it live and raw, ranked fidelity-first. A high-fidelity alternative to pre-built/recrawled docs indexes: it can return the exact latest version and the API contract itself, dimensions a lossy index can't. 4 tools (resolve_source, fetch_docs, latest_version, introspect) + a docs-router skill that maps a question to the right source.",
   "author": {
     "name": "Che Cheng"
