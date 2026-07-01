@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.0]
+
+**ETag conditional-revalidation cache** — the only thesis-safe way to be faster without becoming a stale index. An `ETagCachingHTTPClient` decorator wraps the network layer: when a URL is cached it **always** re-requests with `If-None-Match`, so the server decides freshness. On `304 Not Modified` it serves the cached body (no re-download/re-parse of an unchanged, often large doc like an `llms.txt`); on `200` with a new `ETag` it refreshes. It deliberately ignores `max-age` — "latest" stays latest, it's just cheaper when nothing changed. Sources without an `ETag` (e.g. some registry endpoints) are simply not cached; POSTs (GraphQL introspection) are never cached. In-memory, per session.
+
 ## [0.4.0]
 
 **Installed-version introspection + version reconciliation** (issue #1). Handles targets that have BOTH a web-latest and a locally-installed version.

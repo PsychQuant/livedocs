@@ -11,11 +11,15 @@ public struct HTTPResponse: Sendable, Equatable {
     public let status: Int
     public let contentType: String?
     public let body: Data
+    /// The response's `ETag`, if any — the token for cheap conditional
+    /// revalidation (`If-None-Match`). nil when the server doesn't provide one.
+    public let etag: String?
 
-    public init(status: Int, contentType: String?, body: Data) {
+    public init(status: Int, contentType: String?, body: Data, etag: String? = nil) {
         self.status = status
         self.contentType = contentType
         self.body = body
+        self.etag = etag
     }
 
     public var bodyText: String { String(decoding: body, as: UTF8.self) }
@@ -85,6 +89,7 @@ public struct URLSessionHTTPClient: HTTPClient {
         let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw HTTPError.noResponse }
         let ct = http.value(forHTTPHeaderField: "Content-Type")
-        return HTTPResponse(status: http.statusCode, contentType: ct, body: data)
+        let etag = http.value(forHTTPHeaderField: "ETag")
+        return HTTPResponse(status: http.statusCode, contentType: ct, body: data, etag: etag)
     }
 }

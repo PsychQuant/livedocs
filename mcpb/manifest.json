@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "che-livedocs-mcp",
   "display_name": "LiveDocs",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Primary-source-first, always-latest documentation engine — auto-discovers llms.txt / package registry / repo / OpenAPI / GraphQL / CLI, reads them live and raw. A high-fidelity alternative to pre-built docs indexes.",
   "long_description": "LiveDocs fetches the LATEST documentation for any library from its canonical machine-readable PRIMARY source, on demand. Where a pre-built vector index is periodically recrawled and lossy, LiveDocs auto-discovers each library's source live (llms.txt → npm/PyPI registry → GitHub repo → OpenAPI/GraphQL/CLI introspection) and can return it RAW. It resolves the exact latest version from the registry and reads the API contract itself via introspection — dimensions a pre-built index structurally cannot reach. Results are ranked fidelity-first, then freshness; when no primary source exists it says so, so you can fall back to a generic index and label it low-fidelity. 4 tools: resolve_source, fetch_docs, latest_version, introspect.",
   "author": {

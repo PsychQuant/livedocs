@@ -11,12 +11,12 @@ final class CheLiveDocsMCPServer {
     private let engine: DiscoveryEngine
     private let tools: [Tool]
 
-    init(engine: DiscoveryEngine = DiscoveryEngine(http: URLSessionHTTPClient())) {
+    init(engine: DiscoveryEngine = DiscoveryEngine(http: ETagCachingHTTPClient(inner: URLSessionHTTPClient()))) {
         self.engine = engine
         self.tools = Self.defineTools()
         self.server = Server(
             name: "che-livedocs-mcp",
-            version: "0.4.0",
+            version: "0.5.0",
             capabilities: .init(tools: .init())
         )
         self.transport = StdioTransport()
