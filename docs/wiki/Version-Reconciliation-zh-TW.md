@@ -1,20 +1,31 @@
 > [English](Version-Reconciliation) | 繁體中文
 
-# 版本協調 — 先 detect，再 surface
+# 版本協調
 
-當查詢有可解析的本機目標(已裝套件、CLI、或專案的語言 runtime)時, LiveDocs 把答案錨定在本機版本。核心規則:
+## Step 0 — 有沒有可協調的本機目標?(per-question)
+
+分類*這個特定查詢*, 不是整個工具:
+
+- **web-only** — 沒有本機可對版本的東西:hosted docs、SaaS 或 REST API、或某工具的功能/設定文件。以 web-latest 回答。不協調、不提升級、不 `introspect` —— web 文件不需要「安裝」。
+- **has-local** — 答案取決於本機 artifact:已裝套件的 API、已裝 CLI 的 flag 或版本、或專案的語言 runtime。走下面的 detect/surface。
+
+Claude Code 是最刁鑽的, 而且看題目而定。「怎麼在 Claude Code 設定 MCP」是 web-only —— 答案在線上 docs, 沒有本機 artifact 可 introspect 出設定語意。「已裝的 `claude` 有什麼 flag」「我這版有沒有功能 X」是 has-local —— introspect CLI 的版本與 flag。同一個工具、相反分支, 由問題決定。
+
+## Has-local — 先 detect,再 surface
+
+對 has-local 查詢, LiveDocs 把答案錨定在本機版本。核心規則:
 
 > 以你的本機版本回答。web-latest 只用來判斷你是否落後、以及提供升級, 不當答案本身。
 
-協調分兩相, 讓它 proactive 又不吵:
+分兩相, 讓它 proactive 又不吵:
 
 - Detect(eager、cached、silent):偵測本機版本一次、per-cwd 快取、把每個答案靜默錨在它。web-latest 靠 ETag revalidation 快取便宜地保持最新。
 - Surface(lazy、只在相關時):只在答案 version-sensitive、或真的出現 skew/error 時才提示升級。
 
 ```mermaid
 flowchart TD
-    Q["文件查詢"] --> C{"per-question: 有沒有本機、<br/>version-matched 的源?<br/>(套件 / CLI / 語言 runtime)"}
-    C -->|"web-only<br/>(Claude Code、SaaS、hosted docs)"| W["以 web-latest 回答<br/>(不協調)"]
+    Q["文件查詢"] --> C{"Step 0 (per-question):<br/>有沒有本機、version-matched<br/>的目標? (套件 / CLI / runtime)"}
+    C -->|"web-only<br/>(hosted docs、SaaS、<br/>某工具的設定 / how-to 問題)"| W["以 web-latest 回答<br/>(不協調、不 introspect)"]
     C -->|"has-local"| D["DETECT: 偵測本機版本一次、<br/>per-cwd 快取、錨定答案<br/>(eager、silent)"]
     D --> A["以本機版本回答"]
     A --> S{"version-sensitive 查詢,<br/>或觀察到 skew / error?"}
@@ -33,7 +44,7 @@ flowchart TD
 
 ## 說明
 
-- 分類是 per-question。「怎麼設定 Claude Code」是 web-only;「已裝的 Python 有沒有這個 stdlib API」是 has-local。
+- 分類是 per-question 不是 per-tool —— 上面 Claude Code 的分裂就是標準案例。同一工具可落在任一分支, 看問的是什麼。
 - installed 解析是 cwd-scoped:Python venv、npm `node_modules`、或專案的 runtime toolchain, 不誤用 global。
 - install 是需確認的 mutation, 由 skill 明確確認後執行。MCP 本身維持 read-only;只 introspect, 從不安裝。
 
