@@ -115,7 +115,7 @@ public struct URLSessionHTTPClient: HTTPClient {
         case .failure(let e):
             throw HTTPError.blocked(String(describing: e))
         case .success(let url):
-            if let host = url.host, hostResolvesToBlocked(host) {
+            if let host = url.host, SSRFResolver.resolvesToBlocked(host) {
                 throw HTTPError.blocked("host '\(host)' resolves to an internal address")
             }
             return url
@@ -144,9 +144,14 @@ public struct URLSessionHTTPClient: HTTPClient {
         return HTTPResponse(status: http.statusCode, contentType: ct, body: data, etag: etag)
     }
 
-    /// DNS-resolve a hostname and reject it if any address is internal — closes
-    /// the DNS-rebinding hole where a public name points at an internal IP.
-    private func hostResolvesToBlocked(_ host: String) -> Bool {
+}
+
+/// Shared DNS-resolution guard: resolve a hostname and report whether any address
+/// is internal. Closes the DNS-rebinding hole (a public name pointing at an
+/// internal IP). Used both for the initial URL and — critically — for each
+/// redirect hop, so a 302 to a public name that resolves internally is caught.
+enum SSRFResolver {
+    static func resolvesToBlocked(_ host: String) -> Bool {
         var hints = addrinfo()
         hints.ai_family = AF_UNSPEC
         hints.ai_socktype = SOCK_STREAM
@@ -170,7 +175,8 @@ public struct URLSessionHTTPClient: HTTPClient {
 
 /// Re-validates every redirect hop: a public URL that 302s to an internal host
 /// would otherwise bypass the front-door check, since redirects are followed
-/// automatically. Returning `nil` from the redirect handler cancels the redirect.
+/// automatically. Both the scheme/host classification AND the DNS-resolution
+/// check are applied per hop. Returning `nil` cancels the redirect.
 final class SSRFGuardDelegate: NSObject, URLSessionTaskDelegate {
     func urlSession(_ session: URLSession,
                     task: URLSessionTask,
@@ -178,7 +184,8 @@ final class SSRFGuardDelegate: NSObject, URLSessionTaskDelegate {
                     newRequest request: URLRequest,
                     completionHandler: @escaping (URLRequest?) -> Void) {
         guard let raw = request.url?.absoluteString,
-              case .success = URLSafety.validate(raw) else {
+              case .success(let url) = URLSafety.validate(raw),
+              let host = url.host, !SSRFResolver.resolvesToBlocked(host) else {
             completionHandler(nil)   // block the redirect to an internal/invalid target
             return
         }
