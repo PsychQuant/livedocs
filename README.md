@@ -56,3 +56,5 @@ swift build    # builds the MCP executable
 
 Status: **MVP** — `llms.txt` + registry + repo legs working end-to-end and verified live.
 Shipped: 9-ecosystem registry resolution, version pinning, OpenAPI/GraphQL/CLI + installed-R introspection, `docs-router` skill (incl. per-question has-local/web-only classification + version reconciliation), signed+notarized release, marketplace distribution.
+
+Design boundary (what LiveDocs is and isn't for): [docs/design/primary-source-spectrum.md](docs/design/primary-source-spectrum.md).
