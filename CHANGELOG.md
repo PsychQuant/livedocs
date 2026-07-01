@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.0]
+
+**CRAN (R) registry adapter** — 9th ecosystem. `ecosystem:"cran"` resolves an R package's latest version + repo (from the CRAN `URL`/`BugReports` fields) via the crandb JSON API, feeding the same chain (e.g. `dplyr` → github.com/tidyverse/dplyr → `dplyr.tidyverse.org/llms.txt`). Turns the mechanical half of a hand-curated R docs guide into a live lookup.
+
+No other behavior change.
+
 ## [0.2.0]
 
 Broader dynamic coverage + version pinning. context7 stays a purely external reference — never integrated as a fallback leg (LiveDocs only ever serves live primary sources).

@@ -16,7 +16,7 @@ final class CheLiveDocsMCPServer {
         self.tools = Self.defineTools()
         self.server = Server(
             name: "che-livedocs-mcp",
-            version: "0.2.0",
+            version: "0.3.0",
             capabilities: .init(tools: .init())
         )
         self.transport = StdioTransport()
@@ -34,8 +34,8 @@ final class CheLiveDocsMCPServer {
         let ecosystemEnum: Value = .object([
             "type": .string("string"),
             "enum": .array([.string("npm"), .string("pypi"), .string("crates"), .string("go"),
-                            .string("rubygems"), .string("jsr"), .string("packagist"), .string("maven")]),
-            "description": .string("Package registry the library lives in. npm/pypi auto-detect if omitted; crates/go/rubygems/jsr/packagist/maven MUST be named explicitly. Library format per ecosystem: npm 'react' or '@scope/name'; go full module path 'github.com/gin-gonic/gin'; jsr '@scope/name'; packagist 'vendor/package'; maven 'group:artifact'.")
+                            .string("rubygems"), .string("jsr"), .string("packagist"), .string("maven"), .string("cran")]),
+            "description": .string("Package registry the library lives in. npm/pypi auto-detect if omitted; crates/go/rubygems/jsr/packagist/maven/cran MUST be named explicitly. Library format per ecosystem: npm 'react' or '@scope/name'; go full module path 'github.com/gin-gonic/gin'; jsr '@scope/name'; packagist 'vendor/package'; maven 'group:artifact'; cran (R) 'dplyr'.")
         ])
         let versionProp: Value = .object(["type": .string("string"), "description": .string("Pin to a specific version, e.g. '18.3.1' (React 18 vs 19). Honored for npm/pypi; other ecosystems are latest-only. llms.txt docs are always latest and get labeled as not-pinned.")])
         return [

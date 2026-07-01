@@ -81,7 +81,34 @@ final class RegistryAdaptersTests: XCTestCase {
         XCTAssertEqual(r.version, "33.4.8-jre")
     }
 
+    func testCRAN() throws {
+        let json = #"""
+        {"Package":"dplyr","Version":"1.2.1",
+          "URL":"https://dplyr.tidyverse.org, https://github.com/tidyverse/dplyr",
+          "BugReports":"https://github.com/tidyverse/dplyr/issues"}
+        """#.data(using: .utf8)!
+        let r = try parseCRAN(json)
+        XCTAssertEqual(r.version, "1.2.1")
+        XCTAssertEqual(r.repository, "https://github.com/tidyverse/dplyr")   // forge URL from list
+        XCTAssertEqual(r.homepage, "https://dplyr.tidyverse.org")            // non-forge = docs site
+    }
+
+    func testCRANRepoFromBugReportsWhenURLLacksForge() throws {
+        let json = #"{"Version":"2.0.0","URL":"https://example.org/pkg","BugReports":"https://github.com/o/r/issues"}"#.data(using: .utf8)!
+        let r = try parseCRAN(json)
+        XCTAssertEqual(r.repository, "https://github.com/o/r")   // recovered from BugReports
+        XCTAssertEqual(r.homepage, "https://example.org/pkg")
+    }
+
+    func testCRANNoRepo() throws {
+        let r = try parseCRAN(#"{"Version":"1.0"}"#.data(using: .utf8)!)   // base pkg, no URLs
+        XCTAssertEqual(r.version, "1.0")
+        XCTAssertNil(r.repository)
+        XCTAssertNil(r.homepage)
+    }
+
     func testMalformedRejected() {
+        XCTAssertThrowsError(try parseCRAN(Data("{}".utf8)))   // no Version
         XCTAssertThrowsError(try parseCratesIo(Data("{}".utf8)))
         XCTAssertThrowsError(try parseRubyGems(Data("[]".utf8)))
         XCTAssertThrowsError(try parseGoProxy(Data("{}".utf8)))

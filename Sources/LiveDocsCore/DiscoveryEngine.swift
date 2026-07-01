@@ -1,7 +1,7 @@
 import Foundation
 
 public enum Ecosystem: String, Sendable, CaseIterable {
-    case npm, pypi, crates, go, rubygems, jsr, packagist, maven
+    case npm, pypi, crates, go, rubygems, jsr, packagist, maven, cran
 
     /// Auto-detect order when the caller doesn't name an ecosystem. Deliberately
     /// only npm+PyPI: probing all eight for an unknown name risks a false-positive
@@ -190,6 +190,8 @@ public struct DiscoveryEngine: Sendable {
             return await fetchJSR(library: library)
         case .maven:
             return await fetchMaven(coordinate: library)
+        case .cran:
+            return await getParse("https://crandb.r-pkg.org/\(library)", parseCRAN)
         }
     }
 

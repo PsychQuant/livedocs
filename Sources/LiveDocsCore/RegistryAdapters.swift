@@ -100,6 +100,36 @@ public func parsePackagist(_ data: Data) throws -> RegistryResolution {
     )
 }
 
+/// CRAN (R) — `https://crandb.r-pkg.org/<pkg>` (the metacran JSON DB).
+/// `.Version` is latest; `.URL` is a comma/whitespace-separated list mixing the
+/// docs homepage and (often) the forge repo; `.BugReports` is usually the repo's
+/// `/issues` URL, which is the most reliable way to recover the repo.
+public func parseCRAN(_ data: Data) throws -> RegistryResolution {
+    guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let version = root["Version"] as? String
+    else { throw RegistryError.malformedJSON }
+
+    let urls = ((root["URL"] as? String) ?? "")
+        .split(whereSeparator: { $0 == "," || $0 == " " || $0 == "\n" || $0 == "\t" })
+        .map(String.init)
+    let forgeHosts = ["github.com", "gitlab.com", "bitbucket.org"]
+    func isForge(_ u: String) -> Bool { forgeHosts.contains { u.contains($0) } }
+
+    var repo = normalizeRepoURL(urls.first(where: isForge))
+    if repo == nil, let bug = root["BugReports"] as? String, bug.contains("/issues") {
+        repo = normalizeRepoURL(bug.replacingOccurrences(of: "/issues", with: ""))
+    }
+    let homepage = urls.first(where: { !isForge($0) })   // the docs site (e.g. dplyr.tidyverse.org)
+
+    return RegistryResolution(
+        version: version,
+        homepage: homepage,
+        repository: repo,
+        changelog: nil,
+        documentation: nil
+    )
+}
+
 /// Maven Central — `search.maven.org/solrsearch/select?q=g:<g>+AND+a:<a>&rows=1&wt=json`.
 /// Version-only: repo/SCM lives only in the POM XML (often the parent POM), which
 /// is out of scope here. `.response.docs[0].latestVersion`.

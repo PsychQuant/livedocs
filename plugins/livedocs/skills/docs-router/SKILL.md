@@ -18,7 +18,7 @@ right tool, and prefer LiveDocs primary sources over training memory (which lags
    - Ecosystems + library format: `npm` (`react`, `@scope/name`), `pypi` (`fastapi`),
      `crates` (Rust: `serde`), `go` (full module path `github.com/gin-gonic/gin`),
      `rubygems` (`rails`), `jsr` (Deno: `@std/assert`), `packagist` (PHP: `vendor/package`),
-     `maven` (JVM: `group:artifact`).
+     `maven` (JVM: `group:artifact`), `cran` (R: `dplyr`).
    - `npm`/`pypi` auto-detect if you omit ecosystem; the others **must** be named.
 
 2. **Pick the tool by question type:**
