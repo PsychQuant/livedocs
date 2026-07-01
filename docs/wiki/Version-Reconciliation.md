@@ -10,7 +10,7 @@ Classify *this specific query*, not the tool as a whole:
   or a tool's feature/config docs. Answer from web-latest. No reconciliation, no upgrade
   prompt, no `introspect` call — you don't "install" web docs.
 - **has-local** — the answer depends on a local artifact: an installed package's API, an
-  installed CLI's flags or version, or the project's language runtime. Run detect/surface below.
+  installed CLI's flags or version, or the project's language runtime. Run detect/offer below.
 
 Claude Code is the tricky one, and it splits per-question. "How do I configure MCP in Claude
 Code" is web-only — the answer lives in the online docs; there's no local artifact to introspect
@@ -18,7 +18,7 @@ for config semantics. "What flags does the installed `claude` take", or "does my
 version have feature X", is has-local — introspect the CLI's version and flags. Same tool,
 opposite branches, decided by the question.
 
-## Has-local — detect, then surface
+## Has-local — detect, then offer
 
 For a has-local query LiveDocs anchors the answer to the local version. The governing rule:
 
@@ -30,7 +30,7 @@ Two phases, so it can be proactive without being noisy:
 - Detect (eager, cached, silent): resolve the local version once, cache it per working
   directory, anchor every answer to it. Web-latest stays current cheaply through the ETag
   revalidation cache.
-- Surface (lazy, only when relevant): prompt about upgrading only when the answer is
+- Offer (lazy, only when relevant): offer an upgrade only when the answer is
   version-sensitive or an actual skew/error shows up.
 
 ```mermaid

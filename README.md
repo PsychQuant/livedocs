@@ -62,7 +62,7 @@ swift build    # builds the MCP executable
 Status: shipped. 9-ecosystem registry resolution, version pinning, OpenAPI/GraphQL/CLI +
 installed-R + language-runtime introspection (Python/Node/Go/Rust/Java/.NET/Swift, active-toolchain
 authoritative), ETag revalidation cache, and the `docs-router` skill (per-question
-has-local/web-only classification + detect/surface version reconciliation). Signed+notarized release,
+has-local/web-only classification + detect/offer version reconciliation). Signed+notarized release,
 marketplace distribution.
 
 Design boundary (what LiveDocs is and isn't for): [docs/wiki/Primary-Source-Spectrum.md](docs/wiki/Primary-Source-Spectrum.md).

@@ -23,13 +23,13 @@ for what's being asked?**
 - **has-local** — the answer depends on an installed artifact: an installed package's
   API/behavior, an installed CLI's flags, or the **effective language runtime** version. → go to
   **Version reconciliation**: **detect** (eager, cached, silent) anchors the answer to the local
-  version; **surface** an upgrade prompt only when it's relevant. A bare conceptual query with no
+  version; **offer** an upgrade only when it's relevant. A bare conceptual query with no
   consuming project falls through to web-latest.
 
 Same tool, split per-question: "how do I configure Claude Code" = web-only;
 "what flags does the installed `claude` take" = has-local.
 
-## Version reconciliation (has-local) — detect, then surface
+## Version reconciliation (has-local) — detect, then offer
 
 Two phases, so reconciliation can be **proactive without being noisy**.
 
@@ -40,7 +40,7 @@ silently anchor every answer to it. Cache the detect result **per project workin
 current cheaply because `latest_version` sits behind an ETag conditional-revalidation cache —
 when nothing changed, staying up to date costs almost nothing.
 
-**Surface — lazy, only when relevant.** Prompt about *upgrading* only when the answer is
+**Offer — lazy, only when relevant.** Offer an *upgrade* only when the answer is
 version-sensitive OR an actual skew/error shows up ("why doesn't X work", "should I upgrade",
 "does my version have Y"). When the version gap doesn't affect the answer, stay silent — no
 upgrade prompt. A bare conceptual question with no consuming project → skip the local lookup.
