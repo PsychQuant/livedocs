@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0]
+
+Security and robustness hardening across the fetch and introspection surfaces (addresses the multi-agent review, issues #3–#17).
+
+- **SSRF guard** — every outbound fetch (`fetch_docs`, `resolve_source` docs_url, openapi/graphql) is validated at the single transport choke point: an `http`/`https` scheme allowlist plus a host classifier that rejects loopback / link-local (incl. `169.254.169.254` metadata) / RFC-1918 / ULA / `.internal` / `.local` targets, with a DNS-resolution check for rebinding and a redirect delegate that re-validates every hop.
+- **Response-size ceiling** — bodies are streamed and aborted past a byte limit, bounding the *decompressed* size so a gzip bomb can't OOM the server. The ETag cache is now LRU-bounded (total-byte budget + entry cap) and refuses to store oversized bodies.
+- **`fetch_docs` crash fix** — a negative `max_bytes` no longer traps `prefix(_:)`; truncation is byte-accurate and fetched content is stripped of control/ANSI/bidi characters before returning.
+- **Hardened process runner** — one `ProcessRunner` replaces three copies: pipes are drained concurrently (no >64 KB deadlock), the watchdog escalates SIGTERM → SIGKILL, a timed-out probe surfaces as an error instead of silent truncation, and executable resolution is PATH-first so pyenv/mise/asdf shims are honored.
+- **Runtime introspection accuracy** — version files are refused if they are symlinks (closes a secret-exfil channel) and only version-shaped first lines are accepted; the toolchain probe requires a clean exit and labels the source with the command that actually ran; `parseMiseToml` strips inline comments / rejects arrays and reads the canonical `mise.toml`; uncovered-but-safe languages fall back to the universal pin layer; `introspect kind=runtime` accepts an optional validated `path`.
+- **Single version source** — `LiveDocsVersion` is the one place the version lives; the MCP server, User-Agent (now pointing at `PsychQuant/livedocs`), and the mcpb/plugin/marketplace manifests all track it.
+
 ## [0.6.0]
 
 Proactive language-runtime version detection. `introspect` gains a read-only `runtime` kind that resolves the effective language-runtime version for the current project across Python, Node/TypeScript, Go, Rust, Java, C#/.NET, and Swift. Resolution is two-layer: a universal pin parser reads cross-language declaration files (asdf `.tool-versions`, mise, idiomatic `.<lang>-version` files), and per-language depth adapters probe the active toolchain and read the manifest. The active toolchain is authoritative; declared sources are interpreted by their semantics — a constraint (`requires-python >=3.9`) or a language-mode declaration (`swift-tools-version`) is never reported as an exact version, and an unresolvable runtime returns not-resolved rather than a guessed global version. The `docs-router` skill splits version reconciliation into an eager, per-cwd-cached, silent detect phase and a lazy, only-when-relevant offer phase; defer-to-local and confirmed-install are unchanged.

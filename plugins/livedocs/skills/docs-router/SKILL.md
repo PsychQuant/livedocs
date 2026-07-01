@@ -118,7 +118,7 @@ never installs).
 - *"What gh subcommands exist for releases?"* →
   `introspect{target:"gh", kind:"cli"}`.
 - *"Does React 18 support `use`?"* (version-specific) →
-  `resolve_source{library:"react", ecosystem:"npm", version:"18.3.1"}` → the repo is pinned to that tag; note llms.txt is latest-only.
+  `resolve_source{library:"react", ecosystem:"npm", version:"18.3.1"}` → the **registry** leg resolves that exact version; the repo/changelog and llms.txt legs are default-branch/latest and get labeled "NOT pinned to 18.3.1" — trust the registry version, not the repo content, for a pinned answer.
 - *"Latest tokio (Rust)?"* → `latest_version{library:"tokio", ecosystem:"crates"}`.
 
 ## Why this beats guessing or a generic index
