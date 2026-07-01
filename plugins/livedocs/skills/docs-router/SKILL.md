@@ -10,6 +10,47 @@ canonical **primary source**, live. Everything LiveDocs returns is fetched on
 demand; it never serves a pre-built index. Your job is to route a question to the
 right tool, and prefer LiveDocs primary sources over training memory (which lags).
 
+## Step 0 — Classify the query (per-question): has-local or web-only?
+
+Before routing, ask of **this specific query** (classify per-question, NOT per-target —
+the same tool can be both): **is there a LOCAL, version-matched authoritative source
+for what's being asked?**
+
+- **web-only** — the authoritative docs live only online: a hosted tool's features/config
+  (e.g. "how do I configure MCP in Claude Code"), a SaaS/REST API, a docs site. → go to
+  **Decision flow** and answer from web-latest. **No version reconciliation, no upgrade
+  prompt** — you don't "install" web docs, and you make **no** `introspect`/installed call.
+- **has-local** — the answer depends on an installed artifact: an installed package's
+  API/behavior, or an installed CLI's flags. → if the **context-aware trigger** fires, go to
+  **Version reconciliation**; otherwise fall through to web-latest.
+
+Same tool, split per-question: "how do I configure Claude Code" = web-only;
+"what flags does the installed `claude` take" = has-local.
+
+## Version reconciliation (has-local)
+
+**Context-aware trigger** — reconcile only when warranted: the query is **inside a project
+that uses the package**, OR the query is **version/upgrade/debug-shaped** ("why doesn't X
+work", "should I upgrade", "does my version have Y"). A bare conceptual question with no
+consuming project → **skip the local lookup**, answer from web-latest (bounds latency+noise).
+
+When triggered:
+1. **Local**: `introspect{kind:"r-pkg", target:"<pkg>"}` → installed version (**READ-ONLY**;
+   R first — npm/pip/CLI to come). `resolved_env` tells you which library answered.
+2. **Latest**: `latest_version{library, ecosystem}` → web-latest.
+3. **Compare, then defer to local** — the installed version is **always the answer**; web is
+   used **only** to gate the upgrade:
+   - installed **==** latest → answer from the **installed** docs.
+   - web newer, user **declines** upgrade → answer from the **installed** docs.
+   - web newer, user **confirms** upgrade → **you** (not the MCP) run the install command
+     (`install.packages("<pkg>")` / `npm i` / `pip install -U`), then answer from the
+     now-installed docs.
+   - **Invariant**: every branch ends "answer from local". Never present web-latest docs as
+     the answer to a has-local query.
+
+**Install is a confirmed mutation** — never install without **explicit user confirmation**;
+if not given, nothing is installed. The MCP stays **read-only** (it introspects, never installs).
+
 ## Decision flow
 
 1. **Identify the entity** in the question: the library/tool/API, and — if it's a

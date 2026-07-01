@@ -79,14 +79,14 @@ final class CheLiveDocsMCPServer {
             ),
             Tool(
                 name: "introspect",
-                description: "Introspect the HIGHEST-fidelity 'what can I actually call' source: an OpenAPI/Swagger JSON spec, a GraphQL endpoint's schema, or an installed CLI's --help/--version. This reads the machine contract itself, not prose about it — something a pre-built docs index structurally cannot do. target = a URL (for openapi/graphql) or a bare command name (for cli). kind defaults to auto (URL → try openapi then graphql; bare word → cli).",
+                description: "Introspect the HIGHEST-fidelity 'what can I actually call' source that lives OUTSIDE the web: an OpenAPI/Swagger JSON spec, a GraphQL endpoint's schema, an installed CLI's --help/--version, or the LOCALLY INSTALLED version of an R package (kind=r-pkg — the 'local' half of a version check; READ-ONLY, never installs). This reads the machine/installed artifact itself, not prose about it. target = a URL (openapi/graphql), a bare command name (cli), or an R package name (r-pkg). kind defaults to auto (URL → try openapi then graphql; bare word → cli).",
                 inputSchema: .object([
                     "type": .string("object"),
                     "properties": .object([
                         "target": .object(["type": .string("string"), "description": .string("API base URL / GraphQL endpoint, or a CLI command name like 'gh'")]),
                         "kind": .object([
                             "type": .string("string"),
-                            "enum": .array([.string("auto"), .string("openapi"), .string("graphql"), .string("cli")]),
+                            "enum": .array([.string("auto"), .string("openapi"), .string("graphql"), .string("cli"), .string("r-pkg")]),
                             "description": .string("Force a mode. Default auto.")
                         ]),
                         "flag": .object(["type": .string("string"), "description": .string("CLI mode only: --help (default) or --version")])
@@ -179,6 +179,8 @@ final class CheLiveDocsMCPServer {
         switch kind {
         case "cli":
             return try CLIIntrospect.run(command: target, flag: flag)
+        case "r-pkg":
+            return encodeRInstalled(package: target)
         case "openapi":
             guard let s = await engine.introspectOpenAPI(baseURL: target) else { return #"{"note":"No OpenAPI spec found at that base."}"# }
             return encodeOpenAPI(s)
@@ -243,6 +245,26 @@ final class CheLiveDocsMCPServer {
             "typeCount": s.typeCount,
             "sampleTypes": s.sampleTypes
         ])
+    }
+
+    /// Encode an installed-R-package probe. READ-ONLY: distinguishes R-absent,
+    /// package-not-installed, and installed (with the resolved library path).
+    private func encodeRInstalled(package: String) -> String {
+        switch RIntrospect.installed(package: package) {
+        case .none:
+            return jsonString(["installed_version": NSNull(),
+                               "note": "R (Rscript) not found on this machine; cannot introspect installed R packages."])
+        case .some(.notInstalled):
+            return jsonString(["package": package, "installed_version": NSNull(),
+                               "note": "'\(package)' is not installed in the current context (not fabricating a global version)."])
+        case .some(.malformed):
+            return jsonString(["package": package, "installed_version": NSNull(),
+                               "note": "Could not read the installed version (invalid R package name or R error)."])
+        case .some(.installed(let version, let libPath)):
+            return jsonString(["source": "r-installed", "package": package, "ecosystem": "cran",
+                               "installed_version": version, "resolved_env": libPath,
+                               "note": "READ-ONLY: this is your locally installed version, not the CRAN latest."])
+        }
     }
 
     private func fidelityName(_ f: Fidelity) -> String {
