@@ -56,6 +56,33 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(sources.first?.url, "https://hono.dev/llms-full.txt")
     }
 
+    func testGoModulePathIsRepoWhenProxyOmitsOrigin() async {
+        // proxy returns a version but NO Origin → the module path itself is the repo.
+        let http = FakeHTTP(routes: [
+            "https://proxy.golang.org/github.com/gin-gonic/gin/@latest":
+                HTTPResponse(status: 200, contentType: "application/json",
+                             body: Data(#"{"Version":"v1.12.0"}"#.utf8))
+        ])
+        let engine = DiscoveryEngine(http: http)
+        let res = await engine.latestVersion(library: "github.com/gin-gonic/gin", ecosystem: .go)
+        XCTAssertEqual(res?.version, "v1.12.0")
+        XCTAssertEqual(res?.repository, "https://github.com/gin-gonic/gin")  // derived, not discarded
+    }
+
+    func testPinnedRequestLabelsRepoAsNotPinned() async {
+        // npm react@18.3.1 resolves the version, but the repo URL is HEAD → must be labeled.
+        let http = FakeHTTP(routes: [
+            "https://registry.npmjs.org/react/18.3.1":
+                HTTPResponse(status: 200, contentType: "application/json",
+                             body: Data(#"{"version":"18.3.1","repository":{"url":"git+https://github.com/facebook/react.git"}}"#.utf8))
+        ])
+        let engine = DiscoveryEngine(http: http)
+        let sources = await engine.resolveSources(.init(library: "react", ecosystem: .npm, version: "18.3.1"))
+        let repo = sources.first { $0.kind == .repoReadme }
+        XCTAssertEqual(repo?.version, "18.3.1")
+        XCTAssertTrue(repo?.title?.contains("NOT pinned") ?? false, "repo source must be labeled not-pinned; got \(String(describing: repo?.title))")
+    }
+
     func testNoSignalsYieldsEmpty() async {
         let engine = DiscoveryEngine(http: FakeHTTP(routes: [:]))
         let sources = await engine.resolveSources(.init(library: "does-not-exist", ecosystem: .npm))

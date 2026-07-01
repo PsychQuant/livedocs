@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0]
+
+Broader dynamic coverage + version pinning. context7 stays a purely external reference — never integrated as a fallback leg (LiveDocs only ever serves live primary sources).
+
+**More registry adapters** (all keyless, single live GET, ranked into the same chain): crates.io (Rust), Go modules (proxy.golang.org; module path used as repo when Origin is absent), RubyGems, JSR (Deno; two-call for the repo), Packagist (PHP), Maven Central (version-only). `npm`/`pypi` still auto-detect; the rest need an explicit `ecosystem`.
+
+**Version pinning** — `version` param on `resolve_source`/`latest_version` (e.g. React `18.3.1` vs latest). Honored deterministically by the npm/PyPI registry legs; the repo/changelog/llms.txt sources are labeled "content NOT pinned" since their URLs serve the default branch / latest (llms.txt has no per-version hosting convention). A pin ignored by a latest-only ecosystem is reported, not silently dropped.
+
+**Security** — boundary validation (`isSafePackageName`/`isSafeVersion`) before any name/version is interpolated into a registry URL; Maven `group:artifact` gets a stricter charset so it can't inject extra Solr clauses.
+
+Reviewed by a 4-lens adversarial workflow; 7 findings fixed, 40 unit tests green.
+
 ## [0.1.0]
 
 Initial release — primary-source-first, always-latest documentation engine.

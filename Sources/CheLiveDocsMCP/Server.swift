@@ -16,7 +16,7 @@ final class CheLiveDocsMCPServer {
         self.tools = Self.defineTools()
         self.server = Server(
             name: "che-livedocs-mcp",
-            version: "0.1.0",
+            version: "0.2.0",
             capabilities: .init(tools: .init())
         )
         self.transport = StdioTransport()
@@ -33,9 +33,11 @@ final class CheLiveDocsMCPServer {
     static func defineTools() -> [Tool] {
         let ecosystemEnum: Value = .object([
             "type": .string("string"),
-            "enum": .array([.string("npm"), .string("pypi")]),
-            "description": .string("Package registry the library lives in. Omit to try npm then PyPI.")
+            "enum": .array([.string("npm"), .string("pypi"), .string("crates"), .string("go"),
+                            .string("rubygems"), .string("jsr"), .string("packagist"), .string("maven")]),
+            "description": .string("Package registry the library lives in. npm/pypi auto-detect if omitted; crates/go/rubygems/jsr/packagist/maven MUST be named explicitly. Library format per ecosystem: npm 'react' or '@scope/name'; go full module path 'github.com/gin-gonic/gin'; jsr '@scope/name'; packagist 'vendor/package'; maven 'group:artifact'.")
         ])
+        let versionProp: Value = .object(["type": .string("string"), "description": .string("Pin to a specific version, e.g. '18.3.1' (React 18 vs 19). Honored for npm/pypi; other ecosystems are latest-only. llms.txt docs are always latest and get labeled as not-pinned.")])
         return [
             Tool(
                 name: "resolve_source",
@@ -45,6 +47,7 @@ final class CheLiveDocsMCPServer {
                     "properties": .object([
                         "library": .object(["type": .string("string"), "description": .string("Package name, e.g. react, fastapi")]),
                         "ecosystem": ecosystemEnum,
+                        "version": versionProp,
                         "docs_url": .object(["type": .string("string"), "description": .string("Explicit docs host/URL to probe for llms.txt, e.g. https://hono.dev")])
                     ])
                 ])
@@ -68,7 +71,8 @@ final class CheLiveDocsMCPServer {
                     "type": .string("object"),
                     "properties": .object([
                         "library": .object(["type": .string("string"), "description": .string("Package name")]),
-                        "ecosystem": ecosystemEnum
+                        "ecosystem": ecosystemEnum,
+                        "version": versionProp
                     ]),
                     "required": .array([.string("library")])
                 ])
@@ -118,7 +122,8 @@ final class CheLiveDocsMCPServer {
             let req = DiscoveryRequest(
                 library: args["library"]?.stringValue,
                 ecosystem: args["ecosystem"]?.stringValue.flatMap(Ecosystem.init(rawValue:)),
-                docsURL: args["docs_url"]?.stringValue
+                docsURL: args["docs_url"]?.stringValue,
+                version: args["version"]?.stringValue
             )
             let sources = await engine.resolveSources(req)
             if sources.isEmpty {
@@ -137,10 +142,27 @@ final class CheLiveDocsMCPServer {
         case "latest_version":
             guard let lib = args["library"]?.stringValue else { throw ToolError.missing("library") }
             let eco = args["ecosystem"]?.stringValue.flatMap(Ecosystem.init(rawValue:))
-            guard let res = await engine.latestVersion(library: lib, ecosystem: eco) else {
-                return #"{"version":null,"note":"Not found in npm/PyPI."}"#
+            let pin = args["version"]?.stringValue
+            if let res = await engine.latestVersion(library: lib, ecosystem: eco, version: pin) {
+                // A pin was asked for but the resolved version differs → the pin was
+                // ignored (latest-only ecosystem) or wasn't matched. Say so instead of
+                // passing latest off as the pinned version.
+                if let pin, res.version != pin {
+                    return jsonString([
+                        "version": res.version as Any, "requested": pin,
+                        "note": "Pinned version '\(pin)' not applied — this ecosystem is latest-only (only npm/pypi honor a pin), or the version wasn't found; 'version' is the latest.",
+                        "changelog": res.changelog as Any, "repository": res.repository as Any,
+                        "documentation": res.documentation as Any, "homepage": res.homepage as Any])
+                }
+                return encodeResolution(res)
             }
-            return encodeResolution(res)
+            // A pinned version that didn't resolve: fall back to latest so the agent
+            // learns the current version instead of a bare null.
+            if let pin, let latest = await engine.latestVersion(library: lib, ecosystem: eco) {
+                return jsonString(["version": NSNull(), "requested": pin, "latest": latest.version as Any,
+                                   "note": "Version \(pin) not found; current latest shown under 'latest'."])
+            }
+            return #"{"version":null,"note":"Not found. For crates/go/rubygems/jsr/packagist/maven you must pass ecosystem explicitly (and the right library format)."}"#
 
         case "introspect":
             guard let target = args["target"]?.stringValue else { throw ToolError.missing("target") }
