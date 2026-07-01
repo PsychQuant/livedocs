@@ -35,6 +35,15 @@ let package = Package(
             name: "LiveDocsCoreTests",
             dependencies: ["LiveDocsCore"],
             path: "Tests/LiveDocsCoreTests"
+        ),
+        .testTarget(
+            name: "CheLiveDocsMCPTests",
+            dependencies: [
+                .product(name: "MCP", package: "swift-sdk"),
+                "LiveDocsCore",
+                "CheLiveDocsMCP"
+            ],
+            path: "Tests/CheLiveDocsMCPTests"
         )
     ]
 )
