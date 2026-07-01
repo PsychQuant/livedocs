@@ -77,8 +77,11 @@ public func parseToolVersions(_ content: String) -> [String: String] {
     return out
 }
 
-/// Parse the `[tools]` section of a mise config (`.mise.toml`): `key = "value"`.
-/// Deliberately minimal — only the tools table, only string values.
+/// Parse the `[tools]` section of a mise config (`.mise.toml` / `mise.toml`):
+/// `key = "value"`. Deliberately minimal — only the tools table, only bare string
+/// values. Inline comments are stripped and array / inline-table values are
+/// rejected (they aren't a single version), so `python = "3.11" # main` yields
+/// `3.11`, not `3.11" # main`, and `python = ["3.11","3.10"]` is skipped.
 public func parseMiseToml(_ content: String) -> [String: String] {
     var out: [String: String] = [:]
     var inTools = false
@@ -87,21 +90,53 @@ public func parseMiseToml(_ content: String) -> [String: String] {
         if t.hasPrefix("[") { inTools = (t == "[tools]"); continue }
         guard inTools, let eq = t.firstIndex(of: "=") else { continue }
         let key = t[..<eq].trimmingCharacters(in: .whitespaces)
-        let val = t[t.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+        var raw = t[t.index(after: eq)...].trimmingCharacters(in: .whitespaces)
+        // Array / inline-table values aren't a single version — skip them.
+        if raw.hasPrefix("[") || raw.hasPrefix("{") { continue }
+        // `stripTomlInlineComment` removes a comment that starts outside quotes,
+        // so a `#` inside a quoted value survives (rare, but not a comment).
+        raw = stripTomlInlineComment(raw)
+        let val = raw.trimmingCharacters(in: .whitespaces)
             .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
-        if !key.isEmpty, !val.isEmpty { out[key] = val }
+        // Reject unbalanced-quote residue after unquoting (a malformed value).
+        if val.isEmpty || val.contains("\"") || val.contains("'") { continue }
+        if !key.isEmpty { out[String(key)] = val }
     }
     return out
 }
 
+/// Drop an inline `#` comment that begins *outside* a quoted string.
+private func stripTomlInlineComment(_ s: String) -> String {
+    var quote: Character? = nil
+    var result = ""
+    for ch in s {
+        if let q = quote {
+            result.append(ch)
+            if ch == q { quote = nil }
+            continue
+        }
+        if ch == "\"" || ch == "'" { quote = ch; result.append(ch); continue }
+        if ch == "#" { break }
+        result.append(ch)
+    }
+    return result.trimmingCharacters(in: .whitespaces)
+}
+
 /// Parse an idiomatic per-language version file (`.python-version`, `.nvmrc`,
-/// `.ruby-version`, …): a bare version string, optionally prefixed `v`. Returns
-/// nil when empty.
+/// `.ruby-version`, …): the **first non-empty, non-comment line**, optionally
+/// prefixed `v`. Rejects a value that doesn't start with a digit — pyenv allows
+/// multiple lines, and `.nvmrc` permits aliases (`lts/gallium`, `node`, `stable`)
+/// that are NOT versions and must not be echoed as one. Returns nil when there is
+/// no version-shaped line.
 public func parseIdiomaticVersionFile(_ content: String) -> String? {
-    var v = content.trimmingCharacters(in: .whitespacesAndNewlines)
-    if v.isEmpty { return nil }
-    if v.hasPrefix("v"), let second = v.dropFirst().first, second.isNumber { v.removeFirst() }
-    return v.isEmpty ? nil : v
+    for rawLine in content.split(separator: "\n", omittingEmptySubsequences: false) {
+        var line = rawLine.trimmingCharacters(in: .whitespaces)
+        if line.isEmpty || line.hasPrefix("#") { continue }
+        if line.hasPrefix("v"), let second = line.dropFirst().first, second.isNumber { line.removeFirst() }
+        guard let first = line.first, first.isNumber else { return nil }
+        return line
+    }
+    return nil
 }
 
 // MARK: - Per-language declaration parsers

@@ -14,7 +14,9 @@ import LiveDocsCore
 enum RuntimeIntrospect {
 
     struct LanguageResult {
-        let language: RuntimeLanguage
+        /// The language identifier (an adapter language's raw value, or a
+        /// caller-supplied safe id for the generic pin-layer path).
+        let languageId: String
         let resolution: RuntimeResolution
     }
 
@@ -63,31 +65,35 @@ enum RuntimeIntrospect {
     }
 
     /// Resolve the effective runtime version(s). If `languageId` is given, resolve
-    /// just that language (rejected if unsafe or unknown); otherwise auto-detect
-    /// every depth-adapter language present in `cwd`.
+    /// just that language: a depth-adapter language gets the full treatment; any
+    /// other safe id falls back to the universal pin layer (declared-version only).
+    /// With no id, auto-detect every depth-adapter language present in `cwd`.
     static func resolve(cwd: String, languageId: String?) -> [LanguageResult] {
-        let langs: [RuntimeLanguage]
         if let id = languageId {
-            guard isSafeLanguageId(id), let l = RuntimeLanguage(rawValue: id) else { return [] }
-            langs = [l]
-        } else {
-            langs = detectLanguages(files: directoryEntries(cwd))
+            guard isSafeLanguageId(id) else { return [] }
+            if let l = RuntimeLanguage(rawValue: id) {
+                return [LanguageResult(languageId: id, resolution: resolveOne(l, cwd: cwd))]
+            }
+            // Uncovered but safe language (e.g. ruby, elixir): universal pin layer only.
+            return [LanguageResult(languageId: id, resolution: resolveGeneric(id, cwd: cwd))]
         }
-        return langs.map { LanguageResult(language: $0, resolution: resolveOne($0, cwd: cwd)) }
+        return detectLanguages(files: directoryEntries(cwd))
+            .map { LanguageResult(languageId: $0.rawValue, resolution: resolveOne($0, cwd: cwd)) }
     }
 
     private static func resolveOne(_ lang: RuntimeLanguage, cwd: String) -> RuntimeResolution {
         let ad = adapter(for: lang)
         var candidates: [PinCandidate] = []
 
-        // 1. Active toolchain (authoritative) — probe <cmd> <arg>.
+        // 1. Active toolchain (authoritative) — probe <cmd> <arg>; only trust a
+        //    clean exit, and label the source with the command that actually ran.
         if let probed = probeToolchain(ad.probeCommands, arg: ad.probeArg),
-           let v = parseToolchainVersion(probed, language: lang) {
-            candidates.append(PinCandidate(version: v, source: "\(ad.probeCommands[0]) \(ad.probeArg)", semantics: .activeToolchain))
+           let v = parseToolchainVersion(probed.output, language: lang) {
+            candidates.append(PinCandidate(version: v, source: "\(probed.command) \(ad.probeArg)", semantics: .activeToolchain))
         }
 
-        // 2. Universal pin layer — .tool-versions, .mise.toml (declared, exact).
-        if let v = universalPinVersion(for: lang, cwd: cwd) {
+        // 2. Universal pin layer — .tool-versions, mise config (declared, exact).
+        if let v = universalPinVersion(names: toolNames(for: lang), cwd: cwd) {
             candidates.append(PinCandidate(version: v, source: "universal pin layer", semantics: .exactVersion))
         }
 
@@ -105,21 +111,46 @@ enum RuntimeIntrospect {
         return resolveEffectiveRuntime(candidates, env: cwd)
     }
 
-    /// Look up a declared version for a language across the cross-language pin
-    /// files. Maps our `RuntimeLanguage` to the tool names those files use.
-    private static func universalPinVersion(for lang: RuntimeLanguage, cwd: String) -> String? {
-        let toolNames: [RuntimeLanguage: [String]] = [
-            .python: ["python"], .node: ["node", "nodejs"], .go: ["go", "golang"],
-            .rust: ["rust"], .java: ["java"], .dotnet: ["dotnet"], .swift: ["swift"],
-        ]
-        guard let names = toolNames[lang] else { return nil }
+    /// Universal-pin-only resolution for a language without a depth adapter. Reads
+    /// the cross-language declaration files plus the idiomatic `.<id>-version`, so
+    /// a project declaring e.g. Ruby in `.tool-versions` still gets an answer.
+    private static func resolveGeneric(_ id: String, cwd: String) -> RuntimeResolution {
+        var candidates: [PinCandidate] = []
+        if let v = universalPinVersion(names: [id], cwd: cwd) {
+            candidates.append(PinCandidate(version: v, source: "universal pin layer", semantics: .exactVersion))
+        }
+        if let content = readFile(cwd, ".\(id)-version"), let v = parseIdiomaticVersionFile(content) {
+            candidates.append(PinCandidate(version: v, source: ".\(id)-version", semantics: .exactVersion))
+        }
+        return resolveEffectiveRuntime(candidates, env: cwd)
+    }
+
+    /// The names a language goes by in `.tool-versions` / mise config.
+    private static func toolNames(for lang: RuntimeLanguage) -> [String] {
+        switch lang {
+        case .python: return ["python"]
+        case .node:   return ["node", "nodejs"]
+        case .go:     return ["go", "golang"]
+        case .rust:   return ["rust"]
+        case .java:   return ["java"]
+        case .dotnet: return ["dotnet"]
+        case .swift:  return ["swift"]
+        }
+    }
+
+    /// Look up a declared version across the cross-language pin files, trying each
+    /// alias in `names`. Reads asdf `.tool-versions` and both mise config names
+    /// (`.mise.toml` and the canonical `mise.toml`).
+    private static func universalPinVersion(names: [String], cwd: String) -> String? {
         if let c = readFile(cwd, ".tool-versions") {
             let m = parseToolVersions(c)
             for n in names where m[n] != nil { return m[n] }
         }
-        if let c = readFile(cwd, ".mise.toml") {
-            let m = parseMiseToml(c)
-            for n in names where m[n] != nil { return m[n] }
+        for miseFile in [".mise.toml", "mise.toml"] {
+            if let c = readFile(cwd, miseFile) {
+                let m = parseMiseToml(c)
+                for n in names where m[n] != nil { return m[n] }
+            }
         }
         return nil
     }
@@ -130,53 +161,35 @@ enum RuntimeIntrospect {
         (try? FileManager.default.contentsOfDirectory(atPath: cwd)).map(Set.init) ?? []
     }
 
+    /// Read a version-declaration file, **refusing symlinks**. A malicious project
+    /// could ship `.python-version` as a symlink to `~/.ssh/id_rsa` or `.env`; the
+    /// old `String(contentsOfFile:)` followed it and echoed the secret back as the
+    /// effective version. `attributesOfItem` lstat's (does not follow), so a
+    /// symlink is detected and rejected before any read.
     private static func readFile(_ cwd: String, _ name: String) -> String? {
-        try? String(contentsOfFile: (cwd as NSString).appendingPathComponent(name), encoding: .utf8)
+        let path = (cwd as NSString).appendingPathComponent(name)
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+           (attrs[.type] as? FileAttributeType) == .typeSymbolicLink {
+            return nil
+        }
+        return try? String(contentsOfFile: path, encoding: .utf8)
     }
 
     // MARK: - Toolchain probe (read-only, watchdog-guarded)
 
-    private static func probeToolchain(_ commands: [String], arg: String, timeout: TimeInterval = 8) -> String? {
+    /// Probe the first resolvable command that exits cleanly with a version. Only
+    /// a zero exit is trusted — a failing pyenv shim prints `version 'X' is not
+    /// installed` to stderr with exit 1, and mining that for a version would report
+    /// a runtime that cannot execute. Returns the command that actually answered so
+    /// the source label is honest (not always `probeCommands[0]`).
+    private static func probeToolchain(_ commands: [String], arg: String, timeout: TimeInterval = 8) -> (command: String, output: String)? {
         for cmd in commands {
-            guard let path = resolveExecutable(cmd) else { continue }
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: path)
-            proc.arguments = [arg]
-            let out = Pipe(), err = Pipe()
-            proc.standardOutput = out
-            proc.standardError = err
-            proc.standardInput = FileHandle.nullDevice
-            do { try proc.run() } catch { continue }
-            let killer = DispatchWorkItem { if proc.isRunning { proc.terminate() } }
-            DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
-            proc.waitUntilExit()
-            killer.cancel()
-            let so = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            let se = String(decoding: err.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            // Some toolchains (java) print --version to stderr; merge, prefer stdout.
-            let combined = [so, se].filter { !$0.isEmpty }.joined(separator: "\n")
-            if !combined.isEmpty { return combined }
+            guard let path = ProcessRunner.resolveExecutable(cmd) else { continue }
+            let r = ProcessRunner.run(executable: path, arguments: [arg], timeout: timeout)
+            guard r.launched, !r.timedOut, r.exitCode == 0 else { continue }
+            let combined = r.combined
+            if !combined.isEmpty { return (cmd, combined) }
         }
         return nil
-    }
-
-    private static func resolveExecutable(_ command: String) -> String? {
-        let fm = FileManager.default
-        for dir in ["/usr/local/bin", "/opt/homebrew/bin", "/usr/bin", "/bin"] {
-            let p = "\(dir)/\(command)"
-            if fm.isExecutableFile(atPath: p) { return p }
-        }
-        let proc = Process()
-        proc.executableURL = URL(fileURLWithPath: "/usr/bin/which")
-        proc.arguments = [command]
-        let out = Pipe()
-        proc.standardOutput = out
-        proc.standardError = FileHandle.nullDevice
-        do { try proc.run() } catch { return nil }
-        proc.waitUntilExit()
-        guard proc.terminationStatus == 0 else { return nil }
-        let path = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return path.isEmpty ? nil : path
     }
 }
