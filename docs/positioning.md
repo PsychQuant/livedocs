@@ -31,8 +31,12 @@ footnote.
 ## Three differentiators (all follow from local + direct)
 
 1. Latest. Live from the registry, `llms.txt`, repo, or introspection; never a recrawled
-   snapshot. Proof: context7 listed fastapi's newest as `0.128.0` while PyPI was already at
-   `0.138.2`, about ten versions behind.
+   snapshot. Proof (measured 2026-07-02 by the
+   [vs-context7 harness](../evals/docs-router/README.md#vs-context7-comparison-issue-27)):
+   context7's best version-tagged fastapi entry was `0.128.0` while PyPI was at `0.139.0`,
+   about ten releases behind — and its *top-ranked* match carried no version at all. Numbers
+   rot (this line once said `0.138.2`); the harness is the living source — re-run
+   `evals/docs-router/compare_context7.py` for today's.
 2. Private, no key. Queries never leave your machine. No account, no API key, no hosted quota.
 3. Raw and installed. Returns verbatim primary text, and can read the version you actually
    have. context7 returns ranked, model-summarized snippets, often weeks old.
@@ -48,6 +52,11 @@ footnote.
 | Privacy | queries stay on your machine | queries hit their servers |
 | Access | no account, no API key | hosted (quota / keys) |
 | Breadth | ~any public lib via generic discovery + adapters | large pre-indexed corpus |
+
+The Freshness row is measured, not asserted: the
+[vs-context7 harness](../evals/docs-router/README.md#vs-context7-comparison-issue-27)
+(dated capture + per-library data, honesty caveats inline) is the living source of the
+head-to-head numbers — cite it rather than copying figures into prose that will rot.
 
 ## Honest reality: positioning ≠ winning
 
