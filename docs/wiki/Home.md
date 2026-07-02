@@ -30,8 +30,8 @@ current version each time.
 Honest scope: **freshness only**, on libraries picked *because* they move fast — a re-crawled
 index's hardest case, not a neutral sample. LiveDocs' side is the registry by construction
 (it fetches it live), so the finding here is really about context7's default-match staleness.
-context7 wins on doc/snippet breadth (not measured here) and often carries the current version
-in a *lower-ranked* entry. Method + per-library data:
+context7 wins on doc/snippet breadth (not measured here) and can carry the current version
+in a *lower-ranked* entry (react, in this sample). Method + per-library data:
 [`evals/docs-router`](https://github.com/PsychQuant/livedocs/tree/main/evals/docs-router).
 Deeper positioning: [vs context7](https://github.com/PsychQuant/livedocs/blob/main/docs/positioning.md).
 

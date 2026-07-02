@@ -17,7 +17,7 @@ context7 是以覆蓋率排序、週期性重爬的索引; LiveDocs 直接抓 li
 | 反映當前 release(6 個 library) | 6/6(live registry, by construction) | 0/6 |
 | 來源 | live registry / primary docs | 週期性重爬的索引 |
 
-誠實範圍:只量**新鮮度**, 且刻意挑「快速更新」的 library —— 這是重爬索引最吃虧的情境, 不是中立取樣。LiveDocs 那一側 by construction 就是 registry(它即時抓), 所以這裡真正的發現是 context7 預設匹配的過時程度。context7 的主場是文件 / snippet 廣度(這裡不量), 而且當前版本常常存在於某個 lower-ranked 條目裡。方法與逐 library 數據:
+誠實範圍:只量**新鮮度**, 且刻意挑「快速更新」的 library —— 這是重爬索引最吃虧的情境, 不是中立取樣。LiveDocs 那一側 by construction 就是 registry(它即時抓), 所以這裡真正的發現是 context7 預設匹配的過時程度。context7 的主場是文件 / snippet 廣度(這裡不量), 而當前版本有時存在於某個 lower-ranked 條目裡(本 sample 中 react 如此)。方法與逐 library 數據:
 [`evals/docs-router`](https://github.com/PsychQuant/livedocs/tree/main/evals/docs-router)。更深的定位:[對 context7](https://github.com/PsychQuant/livedocs/blob/main/docs/positioning.md)。
 
 ## 安裝

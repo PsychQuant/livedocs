@@ -36,15 +36,16 @@ def version_matches(answer, ground_truth):
     """True iff the ground-truth version appears as a whole release token in the answer.
 
     Boundary rules (fixed per #27 verify):
-    - not preceded by a digit — so we match the whole number, but a `v`/`@`/space
-      prefix is fine (`v19.2.7`, `react@19.2.7` match `19.2.7`);
+    - not preceded by a digit or `digit.` — so we match the whole number and a
+      *suffix* of a longer version does NOT match (searching `19.2.7` must miss
+      `1.19.2.7`), while a `v`/`@`/space prefix is fine (`v19.2.7`, `react@19.2.7`);
     - not followed by a digit, and not followed by `.<digit>` — so a *prefix* of a
       longer release does NOT match (searching `8.1` must miss `8.1.3`), while a
       trailing sentence period is fine (`19.2.7.` matches `19.2.7`).
     """
     if not answer or not ground_truth:
         return False
-    pattern = r"(?<!\d)" + re.escape(ground_truth) + r"(?!\d)(?!\.\d)"
+    pattern = r"(?<!\d)(?<!\d\.)" + re.escape(ground_truth) + r"(?!\d)(?!\.\d)"
     return re.search(pattern, answer) is not None
 
 
@@ -155,8 +156,8 @@ def main(argv=None):
     print("\nHonesty note: freshness only, on libraries picked *because* they move fast — a "
           "re-crawled index's hardest case, not a neutral sample. LiveDocs' side is the registry "
           "by construction (it fetches it live), so the finding is really context7's default-match "
-          "staleness. context7 wins on doc/snippet breadth (not measured) and often carries the "
-          "current version in a lower-ranked entry.")
+          "staleness. context7 wins on doc/snippet breadth (not measured) and can carry the "
+          "current version in a lower-ranked entry (react, in this sample).")
     return 0
 
 

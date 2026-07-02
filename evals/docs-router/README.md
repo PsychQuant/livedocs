@@ -129,11 +129,12 @@ harness lets the data show it and **concedes** what context7 is good at:
   tautological (`answer == ground_truth`). That's the point — LiveDocs returns the live
   release — but it means the real measured finding is **context7's default-match
   staleness**, not a symmetric contest. The homepage says as much.
-- context7 is a coverage-ranked *doc/snippet retriever*, not a version API. It often
-  *has* the current version in a lower-ranked entry; the sample notes that per
-  library. We measure the freshness of the **default** answer, not "context7 can't
-  find the version." Per library the default is either *behind* (react, vite) or
-  *version-less* (fastapi, pydantic, tokio, serde) — the sample records which.
+- context7 is a coverage-ranked *doc/snippet retriever*, not a version API. It can
+  *have* the current version in a lower-ranked entry (in this sample: react, 1/6);
+  the sample notes that per library. We measure the freshness of the **default**
+  answer, not "context7 can't find the version." Per library the default is either
+  *behind* (react, vite) or *version-less* (fastapi, pydantic, tokio, serde) — the
+  sample records which.
 - **`--verify-live` is one-sided:** it re-fetches the registry (LiveDocs' side) and warns
   on drift, but does not re-query context7. The context7 column is a dated snapshot;
   refresh it by re-running both MCP tools.

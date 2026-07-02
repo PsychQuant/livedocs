@@ -38,6 +38,8 @@ def test_version_matches_boundary_forms():
     assert version_matches("react@19.2.7", "19.2.7") is True
     # a trailing sentence period is fine (not a longer version)
     assert version_matches("the latest is 19.2.7.", "19.2.7") is True
+    # a SUFFIX of a longer version must not match (round-2 fix: dot-prefix guard)
+    assert version_matches("1.19.2.7", "19.2.7") is False
 
 
 def test_judge_row_context7_missing_is_none():
