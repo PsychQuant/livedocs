@@ -11,3 +11,7 @@ openspec/.vector-search.db*
 .claude/worktrees/
 # Machine-local issue-driven-dev config (repo mapping) — not shared.
 .claude/.idd/
+
+# Python bytecode (repo-wide)
+__pycache__/
+*.pyc

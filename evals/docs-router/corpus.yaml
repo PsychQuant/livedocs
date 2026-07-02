@@ -1,0 +1,155 @@
+# docs-router eval corpus.
+#
+# Each case tests whether a varied end-user prompt makes the docs-router skill
+# TRIGGER a LiveDocs query and (for positives) give a correct/current answer.
+#
+# Per-case schema:
+#   id:              unique slug
+#   prompt:          the verbatim end-user prompt fed to `claude -p`
+#   lang:            en | zh   (language axis)
+#   category:        version | config | cli | runtime | negative
+#   expected_trigger: bool     (should a LiveDocs MCP tool fire?)
+#   expected_tools:  [str]     (which livedocs tool(s) are the natural route; informational)
+#   oracle:
+#     type:          self_check | structural | golden | none
+#     # self_check: fetch the registry at eval time, assert the version appears in the answer
+#     library:       package name          (self_check only)
+#     ecosystem:     npm|pypi|crates|...    (self_check only)
+#     # golden: dated exact-substring expectation
+#     expect:        substring              (golden only)
+#     last_verified: YYYY-MM-DD             (golden only)
+#
+# Positives assert (trigger AND oracle). Negatives assert (NOT trigger).
+
+# ── version queries → latest_version (self_check oracle, rot-proof) ────────────
+- id: version-tokio-zh
+  prompt: "tokio 最新版是多少？"
+  lang: zh
+  category: version
+  expected_trigger: true
+  expected_tools: [latest_version, resolve_source]
+  oracle: {type: self_check, library: tokio, ecosystem: crates}
+
+- id: version-fastapi-en
+  prompt: "What's the current released version of fastapi?"
+  lang: en
+  category: version
+  expected_trigger: true
+  expected_tools: [latest_version]
+  oracle: {type: self_check, library: fastapi, ecosystem: pypi}
+
+- id: version-react-indirect-en
+  prompt: "I want to pin to the newest version of react — what number is that right now?"
+  lang: en
+  category: version
+  expected_trigger: true
+  expected_tools: [latest_version]
+  oracle: {type: self_check, library: react, ecosystem: npm}
+
+- id: version-express-zh
+  prompt: "幫我確認 express 目前發布的最新版本號。"
+  lang: zh
+  category: version
+  expected_trigger: true
+  expected_tools: [latest_version]
+  oracle: {type: self_check, library: express, ecosystem: npm}
+
+# ── config / API usage → resolve_source + fetch_docs (structural) ─────────────
+- id: config-hono-cors-en
+  prompt: "How do I configure CORS middleware in Hono?"
+  lang: en
+  category: config
+  expected_trigger: true
+  expected_tools: [resolve_source, fetch_docs]
+  oracle: {type: structural}
+
+- id: config-fastapi-di-zh
+  prompt: "fastapi 的 dependency injection（Depends）怎麼用？給我正確的現行寫法。"
+  lang: zh
+  category: config
+  expected_trigger: true
+  expected_tools: [resolve_source, fetch_docs]
+  oracle: {type: structural}
+
+- id: config-fastapi-embedded-en
+  prompt: "Write me a minimal FastAPI app with one GET endpoint, using the current API."
+  lang: en
+  category: config
+  expected_trigger: true
+  expected_tools: [resolve_source, fetch_docs]
+  oracle: {type: structural}
+
+# ── CLI capabilities → introspect kind=cli (structural) ───────────────────────
+- id: cli-gh-subcommands-en
+  prompt: "What subcommands does the gh CLI have for working with releases?"
+  lang: en
+  category: cli
+  expected_trigger: true
+  expected_tools: [introspect]
+  oracle: {type: structural}
+
+- id: cli-git-zh
+  prompt: "git 這個工具有哪些跟 stash 相關的子指令？"
+  lang: zh
+  category: cli
+  expected_trigger: true
+  expected_tools: [introspect]
+  oracle: {type: structural}
+
+# ── project runtime → introspect kind=runtime (structural) ────────────────────
+- id: runtime-python-zh
+  prompt: "這個專案實際會跑哪個 Python 版本？"
+  lang: zh
+  category: runtime
+  expected_trigger: true
+  expected_tools: [introspect]
+  oracle: {type: structural}
+
+- id: runtime-swift-en
+  prompt: "What Swift toolchain version does this project build with?"
+  lang: en
+  category: runtime
+  expected_trigger: true
+  expected_tools: [introspect]
+  oracle: {type: structural}
+
+# ── negatives → must NOT trigger (general concepts / the user's own code) ──────
+- id: neg-hashmap-en
+  prompt: "What is a hash map, conceptually?"
+  lang: en
+  category: negative
+  expected_trigger: false
+  expected_tools: []
+  oracle: {type: none}
+
+- id: neg-bigo-zh
+  prompt: "簡單解釋一下 big-O notation 是什麼概念。"
+  lang: zh
+  category: negative
+  expected_trigger: false
+  expected_tools: []
+  oracle: {type: none}
+
+- id: neg-my-func-en
+  prompt: "Why does my own function return None here: def f(x):\n    y = x + 1\n    print(y)"
+  lang: en
+  category: negative
+  expected_trigger: false
+  expected_tools: []
+  oracle: {type: none}
+
+- id: neg-my-code-zh
+  prompt: "幫我看這段我自己寫的 code 為什麼跑不出結果（純邏輯，不涉及任何函式庫）。"
+  lang: zh
+  category: negative
+  expected_trigger: false
+  expected_tools: []
+  oracle: {type: none}
+
+- id: neg-bubblesort-en
+  prompt: "Write a bubble sort in plain Python, no libraries."
+  lang: en
+  category: negative
+  expected_trigger: false
+  expected_tools: []
+  oracle: {type: none}
