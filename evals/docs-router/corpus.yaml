@@ -153,3 +153,21 @@
   expected_trigger: false
   expected_tools: []
   oracle: {type: none}
+
+# ── golden (dated exact fact) → exercises the golden oracle path end-to-end ────
+- id: golden-react-license-en
+  prompt: "What open-source license is the react npm package published under? Just the license name."
+  lang: en
+  category: config
+  expected_trigger: true
+  expected_tools: [resolve_source, latest_version]
+  oracle: {type: golden, expect: "MIT", last_verified: "2026-07-02"}
+
+# ── adversarial negative: names a real library but is CONCEPTUAL → must NOT fetch
+- id: neg-react-concept-en
+  prompt: "Conceptually, what problem does React's virtual DOM solve? I don't need any version or API specifics — just the idea."
+  lang: en
+  category: negative
+  expected_trigger: false
+  expected_tools: []
+  oracle: {type: none}
