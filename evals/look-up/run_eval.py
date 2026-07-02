@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""docs-router eval runner.
+"""look-up eval runner.
 
 Loads the prompt corpus, runs each prompt N times through the real Claude Code
 plugin (via detect.run_prompt), scores trigger + correctness, and reports
@@ -150,7 +150,7 @@ def report(results: list) -> int:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="docs-router prompt-triggering + correctness eval")
+    ap = argparse.ArgumentParser(description="look-up prompt-triggering + correctness eval")
     ap.add_argument("--runs", type=int, default=5, help="runs per prompt (statistical; >=1)")
     ap.add_argument("--filter", default=None, help="only run one category")
     ap.add_argument("--dry-run", action="store_true", help="load + enumerate, no live calls")

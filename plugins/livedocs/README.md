@@ -1,7 +1,7 @@
 # livedocs (plugin)
 
 The **LiveDocs** engine as a Claude Code plugin: an MCP server (4 tools) + a
-`docs-router` skill.
+`look-up` skill (implicit auto-fire, or invoke explicitly as `/livedocs:look-up <target>`).
 
 LiveDocs fetches the **latest** documentation for any library from its canonical
 **primary source**, live — `llms.txt` → npm/PyPI registry → GitHub repo →

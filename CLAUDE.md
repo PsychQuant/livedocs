@@ -1,7 +1,7 @@
 # LiveDocs — project instructions
 
 A Claude Code plugin: primary-source-first, always-latest documentation for AI agents.
-Swift MCP server (engine) + `docs-router` skill (routing) + Python evals.
+Swift MCP server (engine) + `look-up` skill (routing) + Python evals.
 
 ## Architecture
 
@@ -10,17 +10,17 @@ Swift MCP server (engine) + `docs-router` skill (routing) + Python evals.
   Network is injected via the `HTTPClient` protocol → unit-testable without a server.
 - `Sources/CheLiveDocsMCP` — thin MCP stdio shell (process/file layer: CLI/R/runtime
   introspection, ProcessRunner).
-- `evals/docs-router/` — Python: skill-eval harness (does `docs-router` fire + answer
+- `evals/look-up/` — Python: skill-eval harness (does `look-up` fire + answer
   currently) + the vs-context7 freshness comparison.
-- Fuzzy "which library is this?" belongs to the calling agent (`docs-router` skill);
+- Fuzzy "which library is this?" belongs to the calling agent (`look-up` skill);
   MCP tools take concrete inputs and do deterministic work.
 
 ## Commands
 
 ```bash
 swift test                                   # 110 Swift tests (no network)
-python3 -m pytest evals/docs-router/tests/   # 41 Python tests (no API calls)
-python3 evals/docs-router/compare_context7.py --verify-live   # freshness snapshot drift check
+python3 -m pytest evals/look-up/tests/   # 41 Python tests (no API calls)
+python3 evals/look-up/compare_context7.py --verify-live   # freshness snapshot drift check
 make release-signed VERSION=vX.Y.Z           # build + sign + notarize + mcpb (needs DEVELOPER_ID/NOTARY_PROFILE)
 bash scripts/sync-wiki.sh                    # mirror docs/wiki/ -> GitHub wiki (after merge)
 ```
@@ -38,7 +38,7 @@ clean non-nested directory with credits.
   `docs/wiki/Testing.md` AND `Testing-zh-TW.md` (headline, code-block comments, per-file
   table, discipline line) plus the Home pages' Guides line. This regressed twice in one day.
 - **Competitive claims are measured, never asserted**: any vs-context7 (or similar) number
-  must come from the `evals/docs-router` harness as a dated capture, with the honesty
+  must come from the `evals/look-up` harness as a dated capture, with the honesty
   caveats stated inline (forward-selected corpus, LiveDocs-side is the registry by
   construction, "version-less" ≠ "behind", concede lower-ranked hits). Never hardcode
   registry versions into prose — cite the harness as the living source (see #27/#29).

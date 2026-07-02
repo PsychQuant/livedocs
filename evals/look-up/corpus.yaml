@@ -1,6 +1,6 @@
-# docs-router eval corpus.
+# look-up eval corpus.
 #
-# Each case tests whether a varied end-user prompt makes the docs-router skill
+# Each case tests whether a varied end-user prompt makes the look-up skill
 # TRIGGER a LiveDocs query and (for positives) give a correct/current answer.
 #
 # Per-case schema:

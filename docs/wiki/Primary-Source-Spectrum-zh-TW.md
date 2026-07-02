@@ -14,7 +14,7 @@ LiveDocs 是 primary-source-first: 任何文件問題, 都去找權威、version
 |---|---|---|---|
 | 第三方公開 library / tool / API | remote(registry / `llms.txt` / repo / OpenAPI / GraphQL), 而且模型的記憶是 stale | LiveDocs auto-discovery chain | LiveDocs(價值最高) |
 | 已裝套件 / CLI | 本機已安裝的 artifact | `introspect`(`cli` / `r-pkg`; npm/pip 待做) | LiveDocs(read-only) |
-| Web-only hosted docs / SaaS(如 Claude Code 功能設定) | remote、只有 latest(無本機版) | 直接查 web-latest, 不協調 | LiveDocs(`docs-router` web-only 分支) |
+| Web-only hosted docs / SaaS(如 Claude Code 功能設定) | remote、只有 latest(無本機版) | 直接查 web-latest, 不協調 | LiveDocs(`look-up` web-only 分支) |
 | 你自己 / 私有 / 內部程式碼 | 本機原始檔(working tree, 永遠最新) | 直接讀檔 | coding agent(不是 LiveDocs) |
 
 ## LiveDocs 價值集中在哪

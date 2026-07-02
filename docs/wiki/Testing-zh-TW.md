@@ -3,12 +3,12 @@
 # 測試
 
 LiveDocs 有兩套獨立 test suite —— **151 個 test,全綠**。Swift suite 驗證引擎;Python suite
-驗證 `docs-router` *skill* 是否真的會激起 LiveDocs 查詢並給出現行答案, 外加 vs-context7 比較
+驗證 `look-up` *skill* 是否真的會激起 LiveDocs 查詢並給出現行答案, 外加 vs-context7 比較
 harness。以下計數是快照;真正的 source of truth 是實際跑一次。
 
 ```bash
 swift test                                  # 110 個 Swift test
-python3 -m pytest evals/docs-router/tests/  # 41 個 Python eval test
+python3 -m pytest evals/look-up/tests/  # 41 個 Python eval test
 ```
 
 ## Swift — 110 個 test（`swift test`）
@@ -42,11 +42,11 @@ python3 -m pytest evals/docs-router/tests/  # 41 個 Python eval test
 | `RuntimeIntrospectTests` | 7 | symlink 版本檔拒絕(防機密外洩)、未覆蓋語言 fallback 到 universal pin layer、canonical `mise.toml`、PATH-first executable 解析。 |
 | `ProcessRunnerTests` | 4 | 大輸出不 deadlock(並發讀 pipe)、exit code 浮現、timeout 回報、SIGTERM→SIGKILL escalation。 |
 
-## Python — 41 個 test（`pytest evals/docs-router/`）
+## Python — 41 個 test（`pytest evals/look-up/`）
 
-`docs-router` **skill eval harness** —— 不是測 Swift 引擎,而是測 skill 對多種 prompt 會不會
+`look-up` **skill eval harness** —— 不是測 Swift 引擎,而是測 skill 對多種 prompt 會不會
 激起 LiveDocs 查詢並答對現行 —— 外加 vs-context7 比較 harness。見
-[`evals/docs-router/README.md`](https://github.com/PsychQuant/livedocs/blob/main/evals/docs-router/README.md)。
+[`evals/look-up/README.md`](https://github.com/PsychQuant/livedocs/blob/main/evals/look-up/README.md)。
 
 | 檔案 | 數 | 測什麼 |
 |------|---:|--------|
