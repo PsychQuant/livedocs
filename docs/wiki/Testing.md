@@ -2,14 +2,14 @@
 
 # Testing
 
-LiveDocs has two independent test suites — **151 tests, all green**. The Swift suite verifies
+LiveDocs has two independent test suites — **152 tests, all green**. The Swift suite verifies
 the engine; the Python suite verifies that the `look-up` *skill* actually triggers a
 LiveDocs query and answers currently, plus the vs-context7 comparison harness. Counts below
 are a snapshot; the source of truth is running the suites.
 
 ```bash
 swift test                                  # 110 Swift tests
-python3 -m pytest evals/look-up/tests/  # 41 Python eval tests
+python3 -m pytest evals/look-up/tests/  # 42 Python eval tests
 ```
 
 ## Swift — 110 tests (`swift test`)
@@ -44,7 +44,7 @@ and file-system layer.
 | `RuntimeIntrospectTests` | 7 | Symlink version-file refusal (secret-exfil guard), uncovered-language fallback to the universal pin layer, canonical `mise.toml`, PATH-first executable resolution. |
 | `ProcessRunnerTests` | 4 | Large output doesn't deadlock (concurrent pipe drain), exit code surfaces, timeout reported, SIGTERM→SIGKILL escalation. |
 
-## Python — 41 tests (`pytest evals/look-up/`)
+## Python — 42 tests (`pytest evals/look-up/`)
 
 The `look-up` **skill eval harness** — not a test of the Swift engine, but of whether
 the skill fires a LiveDocs query for varied prompts and answers currently — plus the
@@ -57,7 +57,7 @@ vs-context7 comparison harness. See
 | `test_compare.py` | 12 | vs-context7 freshness harness: version-token matching (boundary forms), symmetric scoring, table render, corpus↔sample sync. |
 | `test_oracle.py` | 8 | `self_check` (fetch registry at eval time — rot-proof) / `structural` / `golden` oracles. |
 | `test_detect.py` | 7 | `claude -p` stream-json parsing, `is_error` detection, LiveDocs trigger-signal recognition. |
-| `test_corpus.py` | 2 | Corpus coverage guards (a golden case exists + a library-named adversarial negative exists). |
+| `test_corpus.py` | 3 | Corpus coverage guards (a golden case exists + a library-named adversarial negative exists + every explicit /livedocs:look-up argument shape stays represented). |
 
 ## CI and the release gate
 
