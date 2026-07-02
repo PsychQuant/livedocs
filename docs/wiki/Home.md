@@ -12,6 +12,24 @@ An LLM's knowledge of a library is parametric memory frozen at its training cuto
 pre-built index (such as context7) lags its re-crawl. LiveDocs goes direct to the live
 primary source every time, and can reconcile against the version you actually have installed.
 
+## vs context7
+
+That "lags its re-crawl" claim is measured, not asserted. Asked for the current version of
+six fast-moving libraries (npm / PyPI / crates) and checked against each package registry on
+2026-07-02, LiveDocs returned the **exact current version 6/6**; context7's top-ranked default
+match was behind on all six — e.g. React → v18 while the registry is on 19.2.7.
+
+| latest-version freshness | LiveDocs | context7 (default match) |
+|--------------------------|----------|--------------------------|
+| exact current version (6 libs) | **6/6** | 0/6 |
+| source | live registry / primary docs | periodically re-crawled index |
+
+Honest scope: this measures **freshness**, not doc breadth — context7 is a coverage-ranked
+snippet retriever, wins on breadth, and often carries the current version in a lower-ranked
+entry. Method + per-library data:
+[`evals/docs-router`](https://github.com/PsychQuant/livedocs/tree/main/evals/docs-router).
+Deeper positioning: [vs context7](https://github.com/PsychQuant/livedocs/blob/main/docs/positioning.md).
+
 ## Install
 
 ```
