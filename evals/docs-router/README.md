@@ -25,6 +25,8 @@ For each prompt in [`corpus.yaml`](corpus.yaml), the runner:
 ## Run it
 
 ```bash
+pip install -r evals/docs-router/requirements.txt   # PyYAML + pytest
+
 # harness's own unit tests (pure logic — no API calls)
 python3 -m pytest evals/docs-router/tests/
 
@@ -32,9 +34,15 @@ python3 -m pytest evals/docs-router/tests/
 python3 evals/docs-router/run_eval.py --dry-run
 
 # live baseline (makes real `claude -p` calls — costs tokens, minutes per case)
-python3 evals/docs-router/run_eval.py --runs 3
-python3 evals/docs-router/run_eval.py --runs 3 --filter version   # one category
+python3 evals/docs-router/run_eval.py --runs 5
+python3 evals/docs-router/run_eval.py --runs 5 --filter version   # one category
 ```
+
+> **`--runs` must be ≥ 5** for the 80%/20% thresholds to be meaningful: with `N`
+> runs a rate can only land on `{0, 1/N, …, 1}`, so at `N=3` the 80% floor
+> collapses to "must be 3/3" and the 20% ceiling to "must be 0/3" (all-or-nothing).
+> `N=5` is the smallest N where `4/5 = 80%` and `1/5 = 20%` are reachable; the
+> runner warns if you pick an N too small.
 
 Requires the `livedocs` plugin installed (the eval tests the shipped plugin, not
 a mock) and the `claude` CLI on `PATH`.

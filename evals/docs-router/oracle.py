@@ -50,16 +50,32 @@ def fetch_latest_version(library: str, ecosystem: str, timeout: int = 15) -> Opt
     return None
 
 
+# Cap the registry response we buffer. A misbehaving / redirect-hijacked endpoint
+# could otherwise return an unbounded body and exhaust memory (defense-in-depth —
+# the endpoints are fixed first-party TLS registries). A truncated body fails to
+# parse → None → the caller reports inconclusive.
+_MAX_REGISTRY_BYTES = 5_000_000
+
+
 def _get_json(url: str, timeout: int) -> dict:
     req = urllib.request.Request(url, headers={"User-Agent": "livedocs-eval"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+        raw = resp.read(_MAX_REGISTRY_BYTES + 1)
+        if len(raw) > _MAX_REGISTRY_BYTES:
+            raise ValueError(f"registry response exceeded {_MAX_REGISTRY_BYTES}-byte cap")
+        return json.loads(raw.decode("utf-8"))
 
 
 # ── oracle strategies ─────────────────────────────────────────────────────────
 
 def self_check(answer: str, library: str, ecosystem: str,
                fetch_fn: Fetch = fetch_latest_version) -> Tuple[bool, str]:
+    # NOTE (brittle coupling, by design): self_check scores ONLY whether the
+    # current version appears in the answer — it is triggered-agnostic. A pure
+    # memory answer that happens to name today's version would pass here. This is
+    # safe only because run_eval.judge_case gates a positive case on trigger-rate
+    # FIRST (requirement (a) "queried LiveDocs"), so requirement (b) never stands
+    # alone. Keep those two dimensions both-required in judge_case.
     version = fetch_fn(library, ecosystem)
     if not version:
         return False, f"inconclusive: registry unreachable for {library} ({ecosystem})"
