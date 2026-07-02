@@ -39,6 +39,14 @@ python3 evals/docs-router/run_eval.py --runs 3 --filter version   # one category
 Requires the `livedocs` plugin installed (the eval tests the shipped plugin, not
 a mock) and the `claude` CLI on `PATH`.
 
+> **Cost/environment note.** Each case is a full headless `claude -p` agentic run
+> and costs real tokens. Run it from a **clean project directory** (not nested
+> inside another Claude Code session — a nested run inherits the parent's whole
+> MCP/plugin config, inflating the per-call system prompt to tens of thousands of
+> tokens and slowing startup). Budget a few `$` and several minutes for a full
+> `--runs 3` pass, and make sure the account has credits — an out-of-credits
+> account will stall mid-run.
+
 ## The three design decisions
 
 **A — trigger detection = Claude Code headless.** We run the *real plugin* end to
