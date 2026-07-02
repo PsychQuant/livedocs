@@ -26,6 +26,29 @@ def test_corpus_has_a_golden_case_that_evaluates():
         assert evaluate_correctness(c, triggered=True, final_text="something else")[0] is False
 
 
+def test_corpus_covers_explicit_invocation_shapes():
+    # Explicit /livedocs:look-up invocation routing (issue #38): every documented
+    # argument shape gets at least one corpus case, so regressions in the
+    # explicit-doc-lookup contract show up in the eval, not just in prose review.
+    explicit = [c for c in CORPUS if c["category"] == "explicit"]
+    assert explicit, "corpus must exercise explicit /livedocs:look-up invocation (issue #38)"
+    prompts = " || ".join(c["prompt"] for c in explicit)
+    for shape_marker in (
+        "/livedocs:look-up R",        # language (R: not-resolved degrade until #35 lands)
+        "@",                          # name@version pin
+        "dplyr",                      # named-only ecosystem (cran)
+        "https://",                   # URL shape
+        "openapi.json",               # named API schema path
+        "javascript",                 # javascript -> node normalization
+    ):
+        assert shape_marker in prompts, f"missing explicit shape case: {shape_marker}"
+    # Bare invocation loads routing guidance without demanding an argument —
+    # scored as a non-trigger (no library question was asked).
+    bare = [c for c in explicit if c["prompt"].strip() == "/livedocs:look-up"]
+    assert bare and all(c["expected_trigger"] is False for c in bare), \
+        "explicit category needs a bare no-argument case with expected_trigger: false"
+
+
 def test_corpus_has_a_library_named_negative():
     # A negative that names a real library but should NOT trigger (issue #22 gap #12).
     named = [

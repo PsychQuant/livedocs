@@ -7,7 +7,7 @@
 #   id:              unique slug
 #   prompt:          the verbatim end-user prompt fed to `claude -p`
 #   lang:            en | zh   (language axis)
-#   category:        version | config | cli | runtime | negative
+#   category:        version | config | cli | runtime | negative | explicit
 #   expected_trigger: bool     (should a LiveDocs MCP tool fire?)
 #   expected_tools:  [str]     (which livedocs tool(s) are the natural route; informational)
 #   oracle:
@@ -168,6 +168,66 @@
   prompt: "Conceptually, what problem does React's virtual DOM solve? I don't need any version or API specifics — just the idea."
   lang: en
   category: negative
+  expected_trigger: false
+  expected_tools: []
+  oracle: {type: none}
+
+# ── explicit invocation → /livedocs:look-up argument-shape routing (issue #38) ──
+# Structural oracles on purpose: the R case's ANSWER TEXT will change when #35
+# lands an R runtime adapter (not-resolved degrade → real anchor), so we assert
+# "a LiveDocs tool fired + non-empty answer", never golden text.
+- id: explicit-lookup-r-en
+  prompt: "/livedocs:look-up R"
+  lang: en
+  category: explicit
+  expected_trigger: true
+  expected_tools: [introspect]
+  oracle: {type: structural}
+
+- id: explicit-lookup-pin-en
+  prompt: "/livedocs:look-up react@18"
+  lang: en
+  category: explicit
+  expected_trigger: true
+  expected_tools: [resolve_source, fetch_docs]
+  oracle: {type: structural}
+
+- id: explicit-lookup-cran-zh
+  prompt: "/livedocs:look-up dplyr mutate"
+  lang: zh
+  category: explicit
+  expected_trigger: true
+  expected_tools: [resolve_source, fetch_docs]
+  oracle: {type: structural}
+
+- id: explicit-lookup-docs-url-en
+  prompt: "/livedocs:look-up https://hono.dev"
+  lang: en
+  category: explicit
+  expected_trigger: true
+  expected_tools: [resolve_source, fetch_docs]
+  oracle: {type: structural}
+
+- id: explicit-lookup-openapi-url-en
+  prompt: "/livedocs:look-up https://petstore3.swagger.io/api/v3/openapi.json"
+  lang: en
+  category: explicit
+  expected_trigger: true
+  expected_tools: [introspect]
+  oracle: {type: structural}
+
+- id: explicit-lookup-js-alias-en
+  prompt: "/livedocs:look-up javascript"
+  lang: en
+  category: explicit
+  expected_trigger: true
+  expected_tools: [introspect]
+  oracle: {type: structural}
+
+- id: explicit-lookup-noargs-en
+  prompt: "/livedocs:look-up"
+  lang: en
+  category: explicit
   expected_trigger: false
   expected_tools: []
   oracle: {type: none}
