@@ -98,18 +98,29 @@ than hardcoding a fact), and it's statistical (N runs, rate thresholds).
 
 ```bash
 pip install -r evals/docs-router/requirements.txt
-python3 -m pytest evals/docs-router/tests/     # harness unit tests (no API calls)
+python3 -m pytest evals/docs-router/tests/     # 41 harness unit tests (no API calls)
 python3 evals/docs-router/run_eval.py --dry-run
 python3 evals/docs-router/run_eval.py --runs 5 # live baseline (real `claude -p` calls)
 ```
 
-See [`evals/docs-router/README.md`](evals/docs-router/README.md) for the design.
+The same directory carries the **vs-context7 freshness comparison** — a dated, honest
+head-to-head (registry = neutral ground truth) whose numbers the wiki homepage cites:
+
+```bash
+python3 evals/docs-router/compare_context7.py                # table + tally
+python3 evals/docs-router/compare_context7.py --verify-live  # warn if the snapshot drifted
+```
+
+See [`evals/docs-router/README.md`](evals/docs-router/README.md) for the design of both, and
+the [Testing wiki page](https://github.com/PsychQuant/livedocs/wiki/Testing) for the full
+suite breakdown (151 tests: 110 Swift + 41 Python).
 
 Status: shipped (v0.7.0). 9-ecosystem registry resolution, version pinning, OpenAPI/GraphQL/CLI +
 installed-R + language-runtime introspection (Python/Node/Go/Rust/Java/.NET/Swift, active-toolchain
-authoritative), bounded ETag revalidation cache, SSRF-guarded + size-capped fetch, and the
+authoritative), bounded ETag revalidation cache, SSRF-guarded + size-capped fetch, the
 `docs-router` skill (per-question has-local/web-only classification + detect/offer version
-reconciliation). Signed+notarized release, marketplace distribution.
+reconciliation), and a measured vs-context7 freshness comparison cited on the homepage.
+Signed+notarized release, marketplace distribution.
 
 Design boundary (what LiveDocs is and isn't for): [docs/wiki/Primary-Source-Spectrum.md](docs/wiki/Primary-Source-Spectrum.md).
 
