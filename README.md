@@ -1,10 +1,30 @@
-# LiveDocs MCP (`che-livedocs-mcp`)
+# LiveDocs
 
-A primary-source-first, always-latest documentation engine for AI agents.
+A **Claude Code plugin** for primary-source-first, always-latest documentation.
 
 context7 is a pre-built, periodically-recrawled, lossy vector index. LiveDocs instead
 auto-discovers each library's canonical machine-readable source on demand and reads it live.
 It can reach raw primary content and the exact latest version, which a pre-built index can't.
+
+## Install
+
+Two slash commands in Claude Code:
+
+```
+/plugin marketplace add PsychQuant/livedocs
+/plugin install livedocs@livedocs-marketplace
+```
+
+**Or just paste this to your AI and it'll set it up for you:**
+
+```
+Install the "livedocs" Claude Code plugin from https://github.com/PsychQuant/livedocs.
+Run  /plugin marketplace add PsychQuant/livedocs  then  /plugin install livedocs@livedocs-marketplace
+```
+
+After installing, just ask your usual documentation/version questions — the bundled
+`docs-router` skill routes each one to the right tool automatically. (LiveDocs is a network-only
+plugin; its MCP server is signed + notarized and distributed through the marketplace.)
 
 ## Why this exists
 
