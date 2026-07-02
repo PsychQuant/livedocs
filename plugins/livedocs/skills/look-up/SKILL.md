@@ -112,32 +112,53 @@ never installs).
 The user can invoke this skill directly: `/livedocs:look-up <target> [topic...]`.
 Invocation arguments (empty when the skill fired implicitly): $ARGUMENTS
 
-Classify the **first** argument token into exactly one shape, using this precedence
-order; any remaining tokens are a **topic filter** applied when reading the fetched docs:
+Classify the **first** argument token into exactly one of three shapes — **URL**,
+**Language**, **Package** — in this precedence order (CLI introspection is a
+resolution-time fallback inside the Package shape, not a fourth classification);
+any remaining tokens are a **topic filter** applied when reading the fetched docs:
 
-1. **URL** — token starts with `http://` or `https://`. API-endpoint URLs →
-   `introspect{kind:"openapi"|"graphql"}`; documentation-site URLs →
-   `resolve_source{docs_url}` → `fetch_docs`.
+1. **URL** — token starts with `http://` or `https://`. Default route:
+   `resolve_source{docs_url}` → `fetch_docs`. Route to
+   `introspect{kind:"openapi"|"graphql"}` instead when the URL is explicitly an
+   API schema/endpoint (path ends in `/graphql` → graphql; `/openapi.json`,
+   `/openapi.yaml`, or `.json` → openapi), or when docs-site resolution returns
+   `{"sources":[]}` (then `/graphql` paths → graphql, everything else → openapi).
 2. **Language** — token matches (case-insensitively) one of: r, python, node,
-   javascript, go, rust, java, dotnet, swift → `introspect{kind:"runtime",
-   target:<language>}`, then answer language/stdlib questions anchored to the
-   effective local version per **Version reconciliation** above.
-3. **Package** — any other token, optionally version-pinned as `name@version` →
-   `resolve_source{library, ecosystem, version?}` → `fetch_docs` on the top result.
-   Ecosystem resolution follows **Decision flow** step 1 (npm/pypi auto-detect;
-   other ecosystems must be named).
-4. **CLI fallback** — package resolution returned `{"sources":[]}` AND the token
+   javascript, go, rust, java, dotnet, swift. Normalize `javascript` → `node`
+   before introspecting. Route to `introspect{kind:"runtime", target:<language>}`
+   and anchor language/stdlib answers to the effective local version per
+   **Version reconciliation** above. When the runtime comes back **not resolved**
+   (no version source in the project, or a language the engine has no runtime
+   adapter for — today it probes Python/Node/Go/Rust/Java/.NET/Swift; R has no
+   runtime adapter), say so explicitly and answer from web-latest language docs.
+   Never present a guessed version as the local one.
+3. **Package** — any other token, optionally version-pinned as `name@version`.
+   The version is the substring after the **last** `@`; a leading `@` is part of
+   the name (`@types/node` has no pin; `@scope/pkg@1.2.3` pins 1.2.3). Route:
+   `resolve_source{library, ecosystem, version?}` → `fetch_docs` on the top
+   result. Identifying the ecosystem is **your** fuzzy step per **Decision flow**
+   step 1: npm/pypi auto-detect, every other ecosystem must be named by you in
+   the call (e.g. `dplyr` → `ecosystem:"cran"`). Version pins are honored by the
+   npm/pypi registry legs only; for other ecosystems the registry serves latest —
+   state that the pin was not applied.
+   **CLI fallback**: package resolution returned `{"sources":[]}` AND the token
    names an installed command → `introspect{kind:"cli", target:<token>}`.
 
 With **no arguments**, this invocation simply loads the routing guidance — behave
 exactly as when the skill fires implicitly, answering subsequent questions per the
 Decision flow. Never error or demand an argument.
 
-Shape examples: `/livedocs:look-up R` → runtime introspect, R docs anchored to the
-local version · `/livedocs:look-up react@18` → registry docs pinned to 18 ·
-`/livedocs:look-up dplyr mutate` → resolve dplyr, read docs for `mutate` ·
-`/livedocs:look-up https://api.example.com` → OpenAPI introspection ·
-`/livedocs:look-up gh` → package miss, falls back to CLI introspection.
+URL and CLI targets remain subject to the MCP engine's own guards (SSRF host
+classifier on every outbound fetch; CLI safety allowlist + argv-only execution) —
+this section adds routing, not a bypass of those checks.
+
+Shape examples: `/livedocs:look-up R` → runtime introspect; R currently resolves
+not-resolved (no R runtime adapter) → web-latest R docs with that caveat stated ·
+`/livedocs:look-up react@18` → registry docs pinned to 18 ·
+`/livedocs:look-up dplyr mutate` → you name `ecosystem:"cran"`, resolve dplyr,
+read docs for `mutate` · `/livedocs:look-up https://api.example.com/openapi.json`
+→ OpenAPI introspection · `/livedocs:look-up gh` → package miss, falls back to
+CLI introspection.
 
 ## Examples
 

@@ -115,7 +115,8 @@ See [`evals/look-up/README.md`](evals/look-up/README.md) for the design of both,
 the [Testing wiki page](https://github.com/PsychQuant/livedocs/wiki/Testing) for the full
 suite breakdown (151 tests: 110 Swift + 41 Python).
 
-Status: shipped (v0.7.0). 9-ecosystem registry resolution, version pinning, OpenAPI/GraphQL/CLI +
+Status: shipped (v0.8.0; engine features below shipped v0.7.0, the skill's `look-up` rename +
+explicit invocation landed in v0.8.0). 9-ecosystem registry resolution, version pinning (npm/pypi), OpenAPI/GraphQL/CLI +
 installed-R + language-runtime introspection (Python/Node/Go/Rust/Java/.NET/Swift, active-toolchain
 authoritative), bounded ETag revalidation cache, SSRF-guarded + size-capped fetch, the
 `look-up` skill (per-question has-local/web-only classification + detect/offer version
