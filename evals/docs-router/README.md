@@ -95,6 +95,43 @@ config/API → `resolve_source`+`fetch_docs`; CLI → `introspect kind=cli`; run
 task) × language (English / 中文). Negatives cover general concepts and the
 user's own code — where **over-triggering** is itself a failure.
 
+## vs-context7 comparison (issue #27)
+
+A separate, focused dimension: **how fresh is LiveDocs vs context7**, measured on
+one honest, structural axis — **latest-version freshness**, with the package
+registry as neutral ground truth.
+
+```bash
+python3 evals/docs-router/compare_context7.py            # print the table + tally
+python3 evals/docs-router/compare_context7.py --json     # machine-readable
+python3 evals/docs-router/compare_context7.py --verify-live   # warn if the snapshot drifted
+```
+
+- Corpus: [`compare_corpus.yaml`](compare_corpus.yaml) — fast-moving libraries across
+  npm / PyPI / crates.
+- Data: [`compare_context7_sample.json`](compare_context7_sample.json) — a **dated**
+  capture (2026-07-02) of what each tool returned. LiveDocs' answer is checked *by
+  computation* against the registry; context7's is a **recorded human judgment** of
+  whether its top-ranked default match reflects the current release (its answer is
+  prose, not a clean version string). Reproduce by re-running both MCP tools.
+
+**Why this axis, and the honesty guard.** LiveDocs wins here *structurally* (it
+fetches the registry live; a pre-built index reflects its last crawl) — but the
+harness lets the data show it and **concedes** what context7 is good at:
+
+- We measure **freshness only**, never **coverage breadth** — a pre-built index's
+  home turf; measuring coverage would be reverse cherry-picking.
+- context7 is a coverage-ranked *doc/snippet retriever*, not a version API. It often
+  *has* the current version in a lower-ranked entry; the sample notes that per
+  library. We measure the freshness of the **default** answer, not "context7 can't
+  find the version."
+- **D1 (this harness):** a dated recorded head-to-head. **D2 (future, not built):**
+  a fully-automated live A/B that shells `claude -p` per tool — stronger but
+  costly/flaky, so it stays out of the default path.
+
+Result at capture (2026-07-02): LiveDocs returned the exact current version **6/6**;
+context7's top-ranked default match was behind on all six.
+
 ## Scope / caveats
 
 - Measures a **sample**, not a proof of universal correctness — the corpus must

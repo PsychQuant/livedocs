@@ -1,0 +1,45 @@
+{
+  "captured_at": "2026-07-02",
+  "axis": "latest-version freshness",
+  "ground_truth_source": "package registry current version (npm / PyPI / crates)",
+  "method": "For each library: LiveDocs `latest_version` (1 call) and context7 `resolve-library-id` (part of its resolve->query flow). `ground_truth` is the registry's current version at capture time. `livedocs.answer` is verbatim. `context7.answer` describes its TOP-RANKED (highest benchmark score) default match and the version that match reflects; `context7.is_current` is a human judgment of whether that default answer matches the current release. Reproduce by re-running both MCP tools.",
+  "honesty_note": "Freshness only. context7 is a coverage-ranked doc/snippet retriever, not a version API; it wins on doc breadth and frequently carries the current version in a lower-ranked entry (conceded per library below). We do not measure coverage.",
+  "results": [
+    {
+      "id": "react-npm", "library": "react", "ecosystem": "npm",
+      "ground_truth": "19.2.7",
+      "livedocs": {"answer": "19.2.7", "calls": 1, "note": "exact, deterministic from npm registry"},
+      "context7": {"answer": "top match `/reactjs/react.dev` (benchmark 88.51) pinned to **v18**; v19.2.7 exists only in the lower-ranked `/react/react`", "is_current": false, "calls": 2, "note": "default is a major version behind; current exists but not the top result"}
+    },
+    {
+      "id": "vite-npm", "library": "vite", "ecosystem": "npm",
+      "ground_truth": "8.1.3",
+      "livedocs": {"answer": "8.1.3", "calls": 1, "note": "exact"},
+      "context7": {"answer": "top match `/vitejs/vite` lists up to **v8.0.10** — one minor behind 8.1.3", "is_current": false, "calls": 2, "note": "correct major, one minor behind; closest of the six"}
+    },
+    {
+      "id": "fastapi-pypi", "library": "fastapi", "ecosystem": "pypi",
+      "ground_truth": "0.139.0",
+      "livedocs": {"answer": "0.139.0", "calls": 1, "note": "exact"},
+      "context7": {"answer": "top match `/websites/fastapi_tiangolo` is versionless; best version-tagged entry `/fastapi/fastapi` tops out at **0.128.0**", "is_current": false, "calls": 2, "note": "behind by several patch releases"}
+    },
+    {
+      "id": "pydantic-pypi", "library": "pydantic", "ecosystem": "pypi",
+      "ground_truth": "2.13.4",
+      "livedocs": {"answer": "2.13.4", "calls": 1, "note": "exact"},
+      "context7": {"answer": "top matches carry no version; the only version-tagged entry is **v1.10** (a major behind)", "is_current": false, "calls": 2, "note": "no current-version signal in the default result"}
+    },
+    {
+      "id": "tokio-crates", "library": "tokio", "ecosystem": "crates",
+      "ground_truth": "1.52.3",
+      "livedocs": {"answer": "1.52.3", "calls": 1, "note": "exact"},
+      "context7": {"answer": "top match `/websites/rs_tokio` is versionless; the tagged entry is **1.49.0** — behind", "is_current": false, "calls": 2, "note": "several minors behind"}
+    },
+    {
+      "id": "serde-crates", "library": "serde", "ecosystem": "crates",
+      "ground_truth": "1.0.228",
+      "livedocs": {"answer": "1.0.228", "calls": 1, "note": "exact"},
+      "context7": {"answer": "top match `/websites/serde_rs` is versionless; no entry pinned to 1.0.228", "is_current": false, "calls": 2, "note": "no current-version signal in the default result"}
+    }
+  ]
+}

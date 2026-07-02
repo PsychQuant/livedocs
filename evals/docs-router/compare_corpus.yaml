@@ -1,0 +1,32 @@
+# vs-context7 comparison corpus (issue #27).
+#
+# Fast-moving libraries where "current version" changes often enough that a
+# pre-built, periodically-recrawled index lags the live registry. The neutral
+# oracle is the package registry's current version (oracle.fetch_latest_version).
+#
+# Two per ecosystem (npm / pypi / crates) so no single registry dominates the tally.
+# Recorded answers for each tool live in compare_context7_sample.json (dated).
+
+- id: react-npm
+  library: react
+  ecosystem: npm
+
+- id: vite-npm
+  library: vite
+  ecosystem: npm
+
+- id: fastapi-pypi
+  library: fastapi
+  ecosystem: pypi
+
+- id: pydantic-pypi
+  library: pydantic
+  ecosystem: pypi
+
+- id: tokio-crates
+  library: tokio
+  ecosystem: crates
+
+- id: serde-crates
+  library: serde
+  ecosystem: crates
