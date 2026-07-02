@@ -77,6 +77,18 @@ def thresholds_reachable(runs: int, th: Thresholds = DEFAULT_THRESHOLDS):
 
 # ── live running ──────────────────────────────────────────────────────────────
 
+def route_matches(expected_tools: list, tools_fired: list) -> bool:
+    """Explicit-invocation route check (issue #38): at least one of the case's
+    expected primary tools must actually fire. Stream tool names are fully
+    qualified (mcp__plugin_livedocs_livedocs__introspect); the corpus lists
+    short names, so compare on the trailing segment. Empty expectation = no
+    route constraint (e.g. negatives)."""
+    if not expected_tools:
+        return True
+    fired_short = {t.rsplit("__", 1)[-1] for t in (tools_fired or [])}
+    return bool(fired_short & set(expected_tools))
+
+
 def run_case(case: dict, runs: int, cwd: str | None,
              run_fn=detect.run_prompt, fetch_fn=oracle.fetch_latest_version) -> dict:
     base = {"id": case["id"], "category": case["category"], "runs": runs,
@@ -94,17 +106,23 @@ def run_case(case: dict, runs: int, cwd: str | None,
 
     triggers, corrects, failed = [], [], 0
     for _ in range(runs):
-        triggered, _tools, final, ok = run_fn(case["prompt"], cwd=cwd)
+        triggered, tools, final, ok = run_fn(case["prompt"], cwd=cwd)
         if not ok:
             failed += 1          # a failed run is not evidence — exclude it (#2, #3)
             continue
         triggers.append(bool(triggered))
         if case.get("expected_trigger"):
+            # Explicit-invocation cases also require the ROUTE to be right —
+            # a fired-but-wrong tool (e.g. openapi URL answered via fetch_docs)
+            # must not score as correct (issue #38 route check).
+            route_ok = True
+            if case.get("category") == "explicit":
+                route_ok = route_matches(case.get("expected_tools") or [], tools)
             if expected_version is not None:
-                corrects.append(expected_version in (final or ""))
+                corrects.append(route_ok and (expected_version in (final or "")))
             else:
                 c_ok, _ = oracle.evaluate_correctness(case, triggered, final, fetch_fn=fetch_fn)
-                corrects.append(bool(c_ok))
+                corrects.append(route_ok and bool(c_ok))
         else:
             corrects.append(not triggered)
 

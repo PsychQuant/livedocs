@@ -117,3 +117,26 @@ def test_self_check_correct_when_answer_has_current_version():
                  fetch_fn=lambda lib, eco: "1.40.0")
     assert r["passed"] is True
     assert r["correctness_rate"] == 1.0
+
+
+def test_route_matches_compares_short_tool_names():
+    # issue #38: explicit-category route check — fully-qualified stream names
+    # vs corpus short names; empty expectation = unconstrained.
+    from run_eval import route_matches
+    fired = ["mcp__plugin_livedocs_livedocs__introspect"]
+    assert route_matches(["introspect"], fired) is True
+    assert route_matches(["resolve_source", "fetch_docs"], fired) is False
+    assert route_matches([], []) is True
+
+
+def test_run_case_explicit_route_mismatch_scores_incorrect():
+    # issue #38: an explicit case whose expected route did not fire must not
+    # score correct just because SOME LiveDocs tool fired (structural oracle).
+    case = {"id": "x", "category": "explicit", "prompt": "/livedocs:look-up y",
+            "expected_trigger": True, "expected_tools": ["introspect"],
+            "oracle": {"type": "structural"}}
+    def wrong_route(prompt, cwd=None):
+        return True, ["mcp__plugin_livedocs_livedocs__fetch_docs"], "an answer", True
+    r = run_case(case, runs=2, cwd=None, run_fn=wrong_route)
+    assert r["trigger_rate"] == 1.0
+    assert r["correctness_rate"] == 0.0

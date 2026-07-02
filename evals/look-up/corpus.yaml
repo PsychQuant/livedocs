@@ -9,7 +9,9 @@
 #   lang:            en | zh   (language axis)
 #   category:        version | config | cli | runtime | negative | explicit
 #   expected_trigger: bool     (should a LiveDocs MCP tool fire?)
-#   expected_tools:  [str]     (which livedocs tool(s) are the natural route; informational)
+#   expected_tools:  [str]     (which livedocs tool(s) are the natural route; informational
+#                              EXCEPT for category: explicit, where live scoring also requires
+#                              at least one expected tool to actually fire — issue #38 route check)
 #   oracle:
 #     type:          self_check | structural | golden | none
 #     # self_check: fetch the registry at eval time, assert the version appears in the answer
@@ -193,7 +195,7 @@
   oracle: {type: structural}
 
 - id: explicit-lookup-cran-zh
-  prompt: "/livedocs:look-up dplyr mutate"
+  prompt: "/livedocs:look-up dplyr mutate 用法"
   lang: zh
   category: explicit
   expected_trigger: true
@@ -222,6 +224,38 @@
   category: explicit
   expected_trigger: true
   expected_tools: [introspect]
+  oracle: {type: structural}
+
+- id: explicit-lookup-scoped-pin-en
+  # last-@ boundary: two @ characters — leading @ is part of the name, the pin
+  # is the substring after the LAST @ (issue #38 / PR #34 verify last-@ rule).
+  prompt: "/livedocs:look-up @types/node@20"
+  lang: en
+  category: explicit
+  expected_trigger: true
+  expected_tools: [resolve_source, fetch_docs]
+  oracle: {type: structural}
+
+- id: explicit-lookup-crates-pin-en
+  # Non-npm/pypi pin: crates registry serves latest — the answer must state the
+  # pin was not applied (spec scenario "Version pin outside npm/pypi is
+  # surfaced as not applied"). Structural oracle; the not-applied wording is
+  # engine/skill behavior asserted by spec review, not golden text here.
+  prompt: "/livedocs:look-up serde@1.0.100"
+  lang: en
+  category: explicit
+  expected_trigger: true
+  expected_tools: [resolve_source, fetch_docs]
+  oracle: {type: structural}
+
+- id: explicit-lookup-shadow-gh-en
+  # Same-name shadowing: npm package `gh` exists, so the Package shape wins
+  # deterministically over CLI introspection (issue #38 同名遮蔽 requirement).
+  prompt: "/livedocs:look-up gh"
+  lang: en
+  category: explicit
+  expected_trigger: true
+  expected_tools: [resolve_source, fetch_docs]
   oracle: {type: structural}
 
 - id: explicit-lookup-noargs-en

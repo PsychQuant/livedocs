@@ -26,27 +26,47 @@ def test_corpus_has_a_golden_case_that_evaluates():
         assert evaluate_correctness(c, triggered=True, final_text="something else")[0] is False
 
 
+# Explicit /livedocs:look-up routing coverage (issue #38): one case per
+# documented argument shape, id-keyed so a removed/mislabeled case fails loudly.
+# Values: (expected_trigger, oracle type, expected_tools set).
+EXPLICIT_EXPECTATIONS = {
+    "explicit-lookup-r-en":           (True, "structural", {"introspect"}),
+    "explicit-lookup-pin-en":         (True, "structural", {"resolve_source", "fetch_docs"}),
+    "explicit-lookup-scoped-pin-en":  (True, "structural", {"resolve_source", "fetch_docs"}),
+    "explicit-lookup-crates-pin-en":  (True, "structural", {"resolve_source", "fetch_docs"}),
+    "explicit-lookup-cran-zh":        (True, "structural", {"resolve_source", "fetch_docs"}),
+    "explicit-lookup-docs-url-en":    (True, "structural", {"resolve_source", "fetch_docs"}),
+    "explicit-lookup-openapi-url-en": (True, "structural", {"introspect"}),
+    "explicit-lookup-js-alias-en":    (True, "structural", {"introspect"}),
+    "explicit-lookup-shadow-gh-en":   (True, "structural", {"resolve_source", "fetch_docs"}),
+    "explicit-lookup-noargs-en":      (False, "none", set()),
+}
+
+
 def test_corpus_covers_explicit_invocation_shapes():
-    # Explicit /livedocs:look-up invocation routing (issue #38): every documented
-    # argument shape gets at least one corpus case, so regressions in the
-    # explicit-doc-lookup contract show up in the eval, not just in prose review.
-    explicit = [c for c in CORPUS if c["category"] == "explicit"]
-    assert explicit, "corpus must exercise explicit /livedocs:look-up invocation (issue #38)"
-    prompts = " || ".join(c["prompt"] for c in explicit)
-    for shape_marker in (
-        "/livedocs:look-up R",        # language (R: not-resolved degrade until #35 lands)
-        "@",                          # name@version pin
-        "dplyr",                      # named-only ecosystem (cran)
-        "https://",                   # URL shape
-        "openapi.json",               # named API schema path
-        "javascript",                 # javascript -> node normalization
-    ):
-        assert shape_marker in prompts, f"missing explicit shape case: {shape_marker}"
-    # Bare invocation loads routing guidance without demanding an argument —
-    # scored as a non-trigger (no library question was asked).
-    bare = [c for c in explicit if c["prompt"].strip() == "/livedocs:look-up"]
-    assert bare and all(c["expected_trigger"] is False for c in bare), \
-        "explicit category needs a bare no-argument case with expected_trigger: false"
+    # Shapes locked: R language degrade, simple pin, scoped last-@ pin,
+    # non-npm/pypi pin (serde -> not applied), named-only cran + zh topic,
+    # docs-site URL, named openapi.json schema path, javascript->node alias,
+    # same-name shadowing (gh: npm package wins over CLI), bare no-arg.
+    explicit = {c["id"]: c for c in CORPUS if c["category"] == "explicit"}
+    assert set(explicit) == set(EXPLICIT_EXPECTATIONS), (
+        f"explicit case set drifted: extra={set(explicit) - set(EXPLICIT_EXPECTATIONS)}, "
+        f"missing={set(EXPLICIT_EXPECTATIONS) - set(explicit)}"
+    )
+    for cid, (trig, otype, tools) in EXPLICIT_EXPECTATIONS.items():
+        c = explicit[cid]
+        assert c["expected_trigger"] is trig, f"{cid}: expected_trigger != {trig}"
+        assert (c.get("oracle") or {}).get("type") == otype, f"{cid}: oracle.type != {otype}"
+        assert set(c.get("expected_tools") or []) == tools, f"{cid}: expected_tools != {tools}"
+    # Boundary-exact prompt checks (not big-string substring matching):
+    assert explicit["explicit-lookup-r-en"]["prompt"] == "/livedocs:look-up R"
+    assert explicit["explicit-lookup-scoped-pin-en"]["prompt"].count("@") == 2, \
+        "scoped pin case must contain TWO @ to exercise the last-@ split rule"
+    assert explicit["explicit-lookup-crates-pin-en"]["prompt"] == "/livedocs:look-up serde@1.0.100"
+    assert explicit["explicit-lookup-shadow-gh-en"]["prompt"] == "/livedocs:look-up gh"
+    assert explicit["explicit-lookup-noargs-en"]["prompt"].strip() == "/livedocs:look-up"
+    assert any("一" <= ch <= "鿿" for ch in explicit["explicit-lookup-cran-zh"]["prompt"]), \
+        "lang:zh explicit case must actually contain Chinese text"
 
 
 def test_corpus_has_a_library_named_negative():
