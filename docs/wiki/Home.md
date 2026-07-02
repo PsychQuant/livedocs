@@ -34,6 +34,7 @@ Then use the `docs-router` skill; it routes questions to the right tool.
 
 - [Version Reconciliation](Version-Reconciliation): the auto-detect update flow.
 - [Primary-Source Spectrum](Primary-Source-Spectrum): what LiveDocs is and isn't for.
+- [Testing](Testing): the test suites (139 tests) and what each covers.
 
 ## More
 

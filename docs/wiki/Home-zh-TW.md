@@ -30,6 +30,7 @@
 
 - [版本協調流程](Version-Reconciliation-zh-TW): 自動偵測更新流程。
 - [Primary-Source 光譜](Primary-Source-Spectrum-zh-TW): LiveDocs 是什麼、不是什麼。
+- [測試](Testing-zh-TW): 測試套件（139 個 test）與各自覆蓋範圍。
 
 ## 其他
 
