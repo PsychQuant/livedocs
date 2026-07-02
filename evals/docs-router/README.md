@@ -95,6 +95,57 @@ config/API → `resolve_source`+`fetch_docs`; CLI → `introspect kind=cli`; run
 task) × language (English / 中文). Negatives cover general concepts and the
 user's own code — where **over-triggering** is itself a failure.
 
+## vs-context7 comparison (issue #27)
+
+A separate, focused dimension: **how fresh is LiveDocs vs context7**, measured on
+one honest, structural axis — **latest-version freshness**, with the package
+registry as neutral ground truth.
+
+```bash
+python3 evals/docs-router/compare_context7.py            # print the table + tally
+python3 evals/docs-router/compare_context7.py --json     # machine-readable
+python3 evals/docs-router/compare_context7.py --verify-live   # warn if the snapshot drifted
+```
+
+- Corpus: [`compare_corpus.yaml`](compare_corpus.yaml) — fast-moving libraries across
+  npm / PyPI / crates.
+- Data: [`compare_context7_sample.json`](compare_context7_sample.json) — a **dated**
+  capture (2026-07-02) of what each tool returned. LiveDocs' answer is checked *by
+  computation* against the registry; context7's is a **recorded human judgment** of
+  whether its top-ranked default match reflects the current release (its answer is
+  prose, not a clean version string). Reproduce by re-running both MCP tools.
+
+**Why this axis, and the honesty guard.** LiveDocs wins here *structurally* (it
+fetches the registry live; a pre-built index reflects its last crawl) — but the
+harness lets the data show it and **concedes** what context7 is good at:
+
+- We measure **freshness only**, never **coverage breadth** — a pre-built index's
+  home turf; measuring coverage would be reverse cherry-picking.
+- **The corpus is forward-selected** — deliberately fast-moving libraries, where a
+  re-crawled index lags most. This is *not* a neutral sample; it is the case where the
+  difference is real. Stated plainly so the number isn't read as a universal claim.
+- **LiveDocs' side is the registry by construction.** LiveDocs *fetches* the registry,
+  and the ground truth *is* the registry, so `livedocs_current` is effectively
+  tautological (`answer == ground_truth`). That's the point — LiveDocs returns the live
+  release — but it means the real measured finding is **context7's default-match
+  staleness**, not a symmetric contest. The homepage says as much.
+- context7 is a coverage-ranked *doc/snippet retriever*, not a version API. It can
+  *have* the current version in a lower-ranked entry (in this sample: react, 1/6);
+  the sample notes that per library. We measure the freshness of the **default**
+  answer, not "context7 can't find the version." Per library the default is either
+  *behind* (react, vite) or *version-less* (fastapi, pydantic, tokio, serde) — the
+  sample records which.
+- **`--verify-live` is one-sided:** it re-fetches the registry (LiveDocs' side) and warns
+  on drift, but does not re-query context7. The context7 column is a dated snapshot;
+  refresh it by re-running both MCP tools.
+- **D1 (this harness):** a dated recorded head-to-head. **D2 (future, not built):**
+  a fully-automated live A/B that shells `claude -p` per tool — stronger but
+  costly/flaky, so it stays out of the default path.
+
+Result at capture (2026-07-02): context7's top-ranked default match reflected the current
+release on **0 of 6** (behind for react/vite, version-less for fastapi/pydantic/tokio/serde);
+LiveDocs returned the live registry version each time.
+
 ## Scope / caveats
 
 - Measures a **sample**, not a proof of universal correctness — the corpus must
