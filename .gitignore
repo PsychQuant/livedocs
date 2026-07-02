@@ -7,3 +7,7 @@ xcuserdata/
 .spectra/
 openspec/.vector-search.db*
 .impeccable/
+# Transient git worktrees created by the harness — never commit these.
+.claude/worktrees/
+# Machine-local issue-driven-dev config (repo mapping) — not shared.
+.claude/.idd/
