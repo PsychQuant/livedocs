@@ -20,4 +20,4 @@
 ## 4. 全域驗證與發布
 
 - [x] 4.1 全 repo 一致性驗證 — 交付：非歷史檔案零 docs-router 殘留、兩套測試 green。驗證：grep -r docs-router 在排除 CHANGELOG.md 歷史 entries、openspec/changes/archive/、openspec/specs/ 的 @trace 區塊、openspec/changes/rename-docs-router-to-look-up/ 之後零命中；swift test 110 tests green；python3 -m pytest evals/look-up/tests/ 41 tests green。
-- [ ] 4.2 發布鏈（post-merge step — 依 IDD 慣例 pipeline 停在 verified，本 task 於 PR merge 後執行，非 merge blocker）— 交付：使用者端可經 marketplace 安裝 0.8.0 並看到 look-up。PR merge 後執行 /plugin-tools:plugin-update livedocs 同步 psychquant-claude-plugins marketplace，並跑 bash scripts/sync-wiki.sh 鏡射 wiki。驗證：marketplace 更新後 plugin entry 版本顯示 0.8.0；本機 claude plugin update 後 /livedocs:look-up 出現在 skill 清單。
+- [x] 4.2 發布鏈（post-merge step — 依 IDD 慣例 pipeline 停在 verified，本 task 於 PR merge 後執行，非 merge blocker）— 交付：使用者端可經 marketplace 安裝 0.8.0 並看到 look-up。PR merge 後執行 /plugin-tools:plugin-update livedocs 同步 psychquant-claude-plugins marketplace，並跑 bash scripts/sync-wiki.sh 鏡射 wiki。驗證：marketplace 更新後 plugin entry 版本顯示 0.8.0；本機 claude plugin update 後 /livedocs:look-up 出現在 skill 清單。
