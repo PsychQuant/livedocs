@@ -32,11 +32,11 @@ footnote.
 
 1. Latest. Live from the registry, `llms.txt`, repo, or introspection; never a recrawled
    snapshot. Proof (measured 2026-07-02 by the
-   [vs-context7 harness](../evals/docs-router/README.md#vs-context7-comparison-issue-27)):
+   [vs-context7 harness](../evals/look-up/README.md#vs-context7-comparison-issue-27)):
    context7's best version-tagged fastapi entry was `0.128.0` while PyPI was at `0.139.0`,
    about ten releases behind — and its *top-ranked* match carried no version at all. Numbers
    rot (this line once said `0.138.2`); the harness is the living source — re-run
-   `evals/docs-router/compare_context7.py` for today's.
+   `evals/look-up/compare_context7.py` for today's.
 2. Private, no key. Queries never leave your machine. No account, no API key, no hosted quota.
 3. Raw and installed. Returns verbatim primary text, and can read the version you actually
    have. context7 returns ranked, model-summarized snippets, often weeks old.
@@ -54,7 +54,7 @@ footnote.
 | Breadth | ~any public lib via generic discovery + adapters | large pre-indexed corpus |
 
 The Freshness row is measured, not asserted: the
-[vs-context7 harness](../evals/docs-router/README.md#vs-context7-comparison-issue-27)
+[vs-context7 harness](../evals/look-up/README.md#vs-context7-comparison-issue-27)
 (dated capture + per-library data, honesty caveats inline) is the living source of the
 head-to-head numbers — cite it rather than copying figures into prose that will rot.
 
@@ -63,7 +63,7 @@ head-to-head numbers — cite it rather than copying figures into prose that wil
 context7 leads on distribution, not fidelity. Better-but-niche loses to worse-but-universal.
 A sharp message buys mindshare, not users. To compete we still need context7's winning half:
 
-- Frictionless install. Already true: an MCP plus the `docs-router` skill, one line to add.
+- Frictionless install. Already true: an MCP plus the `look-up` skill, one line to add.
 - Presence where devs look: README, awesome-lists, being carried by default in other tools.
 - Breadth for the long tail: generic discovery (`llms.txt`, registry, repo) plus a shared
   adapter marketplace that ships metadata, not content. Not a central cache.

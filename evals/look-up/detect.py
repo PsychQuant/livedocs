@@ -1,4 +1,4 @@
-"""Trigger detection: did a prompt make the docs-router skill query LiveDocs?
+"""Trigger detection: did a prompt make the look-up skill query LiveDocs?
 
 Two halves:
   - parse_stream(text)   PURE  — turn a `claude -p --output-format stream-json`

@@ -32,7 +32,7 @@ index's hardest case, not a neutral sample. LiveDocs' side is the registry by co
 (it fetches it live), so the finding here is really about context7's default-match staleness.
 context7 wins on doc/snippet breadth (not measured here) and can carry the current version
 in a *lower-ranked* entry (react, in this sample). Method + per-library data:
-[`evals/docs-router`](https://github.com/PsychQuant/livedocs/tree/main/evals/docs-router).
+[`evals/look-up`](https://github.com/PsychQuant/livedocs/tree/main/evals/look-up).
 Deeper positioning: [vs context7](https://github.com/PsychQuant/livedocs/blob/main/docs/positioning.md).
 
 ## Install
@@ -42,7 +42,7 @@ Deeper positioning: [vs context7](https://github.com/PsychQuant/livedocs/blob/ma
 /plugin install livedocs@livedocs-marketplace
 ```
 
-Then use the `docs-router` skill; it routes questions to the right tool.
+Then use the `look-up` skill; it routes questions to the right tool.
 
 ## Tools
 

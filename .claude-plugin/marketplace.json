@@ -11,7 +11,7 @@
     {
       "name": "livedocs",
       "version": "0.7.0",
-      "description": "Always-latest docs engine — auto-discovers llms.txt / package registry / repo / OpenAPI / GraphQL / CLI and reads them live and raw. High-fidelity alternative to pre-built docs indexes. 4 tools + a docs-router skill.",
+      "description": "Always-latest docs engine — auto-discovers llms.txt / package registry / repo / OpenAPI / GraphQL / CLI and reads them live and raw. High-fidelity alternative to pre-built docs indexes. 4 tools + a look-up skill.",
       "author": {
         "name": "Che Cheng"
       },

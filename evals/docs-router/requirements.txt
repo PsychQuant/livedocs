@@ -1,4 +1,0 @@
-# docs-router eval harness dependencies.
-#   pip install -r evals/docs-router/requirements.txt
-PyYAML>=6.0      # corpus.yaml parsing (run_eval.py)
-pytest>=7.0      # unit tests (tests/)

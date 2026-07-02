@@ -3,13 +3,13 @@
 # Testing
 
 LiveDocs has two independent test suites — **151 tests, all green**. The Swift suite verifies
-the engine; the Python suite verifies that the `docs-router` *skill* actually triggers a
+the engine; the Python suite verifies that the `look-up` *skill* actually triggers a
 LiveDocs query and answers currently, plus the vs-context7 comparison harness. Counts below
 are a snapshot; the source of truth is running the suites.
 
 ```bash
 swift test                                  # 110 Swift tests
-python3 -m pytest evals/docs-router/tests/  # 41 Python eval tests
+python3 -m pytest evals/look-up/tests/  # 41 Python eval tests
 ```
 
 ## Swift — 110 tests (`swift test`)
@@ -44,12 +44,12 @@ and file-system layer.
 | `RuntimeIntrospectTests` | 7 | Symlink version-file refusal (secret-exfil guard), uncovered-language fallback to the universal pin layer, canonical `mise.toml`, PATH-first executable resolution. |
 | `ProcessRunnerTests` | 4 | Large output doesn't deadlock (concurrent pipe drain), exit code surfaces, timeout reported, SIGTERM→SIGKILL escalation. |
 
-## Python — 41 tests (`pytest evals/docs-router/`)
+## Python — 41 tests (`pytest evals/look-up/`)
 
-The `docs-router` **skill eval harness** — not a test of the Swift engine, but of whether
+The `look-up` **skill eval harness** — not a test of the Swift engine, but of whether
 the skill fires a LiveDocs query for varied prompts and answers currently — plus the
 vs-context7 comparison harness. See
-[`evals/docs-router/README.md`](https://github.com/PsychQuant/livedocs/blob/main/evals/docs-router/README.md).
+[`evals/look-up/README.md`](https://github.com/PsychQuant/livedocs/blob/main/evals/look-up/README.md).
 
 | File | Tests | Covers |
 |------|------:|--------|

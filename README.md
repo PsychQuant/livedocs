@@ -23,7 +23,7 @@ Run  /plugin marketplace add PsychQuant/livedocs  then  /plugin install livedocs
 ```
 
 After installing, just ask your usual documentation/version questions — the bundled
-`docs-router` skill routes each one to the right tool automatically. (LiveDocs is a network-only
+`look-up` skill routes each one to the right tool automatically. (LiveDocs is a network-only
 plugin; its MCP server is signed + notarized and distributed through the marketplace.)
 
 ## Why this exists
@@ -46,7 +46,7 @@ source LiveDocs can read verbatim.
 4. Introspection (`introspect`). Read directly from the machine or installed artifact: an
    OpenAPI / GraphQL schema, an installed CLI's `--help`, or an installed R package's version
    (`kind:"r-pkg"`, read-only). This is the local half of a version check. For a target that has
-   both a web-latest and an installed version, the `docs-router` skill reconciles them and answers
+   both a web-latest and an installed version, the `look-up` skill reconciles them and answers
    from the installed version; the web-latest only gates the upgrade.
 5. Fallback. context7 / web, always labeled low-fidelity.
 
@@ -76,7 +76,7 @@ defeating gzip bombs), and returned text is stripped of control / ANSI / bidi ch
   unit-tested without a server or the network.
 - `CheLiveDocsMCP`. A thin MCP stdio shell over the engine.
 
-The fuzzy "which library is this?" decision belongs to the calling agent (the `docs-router`
+The fuzzy "which library is this?" decision belongs to the calling agent (the `look-up`
 skill); these tools take concrete inputs and do deterministic work.
 
 ## Develop
@@ -89,36 +89,36 @@ swift build    # builds the MCP executable
 CI runs `swift build` + `swift test` on every push/PR. `scripts/release.sh` gates the release on a
 green `swift test`, a version-source match against the tag, and Developer ID signing + notarization.
 
-### Skill eval (`evals/docs-router/`)
+### Skill eval (`evals/look-up/`)
 
-A Python harness that measures whether the `docs-router` skill actually *fires a LiveDocs query*
+A Python harness that measures whether the `look-up` skill actually *fires a LiveDocs query*
 for varied end-user prompts and answers currently — the trigger reliability the whole product
 depends on. The oracle is rot-proof by design (version cases fetch the registry at eval time rather
 than hardcoding a fact), and it's statistical (N runs, rate thresholds).
 
 ```bash
-pip install -r evals/docs-router/requirements.txt
-python3 -m pytest evals/docs-router/tests/     # 41 harness unit tests (no API calls)
-python3 evals/docs-router/run_eval.py --dry-run
-python3 evals/docs-router/run_eval.py --runs 5 # live baseline (real `claude -p` calls)
+pip install -r evals/look-up/requirements.txt
+python3 -m pytest evals/look-up/tests/     # 41 harness unit tests (no API calls)
+python3 evals/look-up/run_eval.py --dry-run
+python3 evals/look-up/run_eval.py --runs 5 # live baseline (real `claude -p` calls)
 ```
 
 The same directory carries the **vs-context7 freshness comparison** — a dated, honest
 head-to-head (registry = neutral ground truth) whose numbers the wiki homepage cites:
 
 ```bash
-python3 evals/docs-router/compare_context7.py                # table + tally
-python3 evals/docs-router/compare_context7.py --verify-live  # warn if the snapshot drifted
+python3 evals/look-up/compare_context7.py                # table + tally
+python3 evals/look-up/compare_context7.py --verify-live  # warn if the snapshot drifted
 ```
 
-See [`evals/docs-router/README.md`](evals/docs-router/README.md) for the design of both, and
+See [`evals/look-up/README.md`](evals/look-up/README.md) for the design of both, and
 the [Testing wiki page](https://github.com/PsychQuant/livedocs/wiki/Testing) for the full
 suite breakdown (151 tests: 110 Swift + 41 Python).
 
 Status: shipped (v0.7.0). 9-ecosystem registry resolution, version pinning, OpenAPI/GraphQL/CLI +
 installed-R + language-runtime introspection (Python/Node/Go/Rust/Java/.NET/Swift, active-toolchain
 authoritative), bounded ETag revalidation cache, SSRF-guarded + size-capped fetch, the
-`docs-router` skill (per-question has-local/web-only classification + detect/offer version
+`look-up` skill (per-question has-local/web-only classification + detect/offer version
 reconciliation), and a measured vs-context7 freshness comparison cited on the homepage.
 Signed+notarized release, marketplace distribution.
 
