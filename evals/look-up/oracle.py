@@ -1,4 +1,4 @@
-"""Correctness oracles for docs-router eval.
+"""Correctness oracles for look-up eval.
 
 Three strategies, chosen so the oracle never becomes the stale index LiveDocs
 exists to replace:

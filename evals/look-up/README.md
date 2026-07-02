@@ -1,6 +1,6 @@
-# docs-router eval
+# look-up eval
 
-Does the `docs-router` skill actually **query LiveDocs** when a user asks a
+Does the `look-up` skill actually **query LiveDocs** when a user asks a
 docs/version/API question — across varied phrasings — and does it give a
 **correct/current** answer? This harness measures both.
 
@@ -25,17 +25,17 @@ For each prompt in [`corpus.yaml`](corpus.yaml), the runner:
 ## Run it
 
 ```bash
-pip install -r evals/docs-router/requirements.txt   # PyYAML + pytest
+pip install -r evals/look-up/requirements.txt   # PyYAML + pytest
 
 # harness's own unit tests (pure logic — no API calls)
-python3 -m pytest evals/docs-router/tests/
+python3 -m pytest evals/look-up/tests/
 
 # smoke: load + enumerate the corpus, no live calls
-python3 evals/docs-router/run_eval.py --dry-run
+python3 evals/look-up/run_eval.py --dry-run
 
 # live baseline (makes real `claude -p` calls — costs tokens, minutes per case)
-python3 evals/docs-router/run_eval.py --runs 5
-python3 evals/docs-router/run_eval.py --runs 5 --filter version   # one category
+python3 evals/look-up/run_eval.py --runs 5
+python3 evals/look-up/run_eval.py --runs 5 --filter version   # one category
 ```
 
 > **`--runs` must be ≥ 5** for the 80%/20% thresholds to be meaningful: with `N`
@@ -102,9 +102,9 @@ one honest, structural axis — **latest-version freshness**, with the package
 registry as neutral ground truth.
 
 ```bash
-python3 evals/docs-router/compare_context7.py            # print the table + tally
-python3 evals/docs-router/compare_context7.py --json     # machine-readable
-python3 evals/docs-router/compare_context7.py --verify-live   # warn if the snapshot drifted
+python3 evals/look-up/compare_context7.py            # print the table + tally
+python3 evals/look-up/compare_context7.py --json     # machine-readable
+python3 evals/look-up/compare_context7.py --verify-live   # warn if the snapshot drifted
 ```
 
 - Corpus: [`compare_corpus.yaml`](compare_corpus.yaml) — fast-moving libraries across

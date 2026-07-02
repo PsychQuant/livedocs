@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0]
+
+**BREAKING**: the plugin skill `docs-router` is renamed to `look-up` — the explicit command moves from `/livedocs:docs-router` to `/livedocs:look-up`. The skill was always dual-mode (Claude Code default); the old name described internal mechanics and made the explicit entry undiscoverable. The frontmatter description is unchanged, so implicit auto-fire behavior is identical. Migration: invoke `/livedocs:look-up` instead of `/livedocs:docs-router`; no other action needed.
+
+- New **Explicit invocation** contract in the skill: `/livedocs:look-up <target> [topic...]` classifies the first argument deterministically (URL → language → package `name@version` → CLI fallback) and routes to the matching LiveDocs tool; remaining tokens act as a topic filter; a bare invocation just loads the routing guidance.
+- The eval harness directory moves `evals/docs-router/` → `evals/look-up/` to follow the skill name. Historical CHANGELOG entries and archived openspec records keep the old name (provenance, not rewritten).
+- Plugin-shell-only release: the MCP binary is unchanged (`binary_version` stays 0.7.0).
+
 ## [0.7.0]
 
 Security and robustness hardening across the fetch and introspection surfaces (addresses the multi-agent review, issues #3–#17).

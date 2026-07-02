@@ -19,7 +19,7 @@ type, not by assuming it always lives on the web.
 |---|---|---|---|
 | Third-party public library / tool / API | remote (registry / `llms.txt` / repo / OpenAPI / GraphQL), and the model's memory of it is stale | LiveDocs auto-discovery chain | LiveDocs (value highest here) |
 | Installed package / CLI | the locally installed artifact | `introspect` (`cli` / `r-pkg`; npm/pip to come) | LiveDocs (read-only) |
-| Web-only hosted docs / SaaS (e.g. Claude Code features/config) | remote, latest-only (no local version) | web-latest fetch, no reconciliation | LiveDocs (`docs-router` web-only branch) |
+| Web-only hosted docs / SaaS (e.g. Claude Code features/config) | remote, latest-only (no local version) | web-latest fetch, no reconciliation | LiveDocs (`look-up` web-only branch) |
 | Your own / private / internal code | local source files (the working tree, always current) | read the files directly | the coding agent (NOT LiveDocs) |
 
 ## Where LiveDocs's value is concentrated
