@@ -33,13 +33,19 @@ SAMPLE_PATH = os.path.join(HERE, "compare_context7_sample.json")
 
 
 def version_matches(answer, ground_truth):
-    """True iff the ground-truth version appears as a whole token in the answer.
+    """True iff the ground-truth version appears as a whole release token in the answer.
 
-    Whole-token so "8.1" does not match "8.1.3" (a prefix is not the release).
+    Boundary rules (fixed per #27 verify):
+    - not preceded by a digit — so we match the whole number, but a `v`/`@`/space
+      prefix is fine (`v19.2.7`, `react@19.2.7` match `19.2.7`);
+    - not followed by a digit, and not followed by `.<digit>` — so a *prefix* of a
+      longer release does NOT match (searching `8.1` must miss `8.1.3`), while a
+      trailing sentence period is fine (`19.2.7.` matches `19.2.7`).
     """
     if not answer or not ground_truth:
         return False
-    return re.search(r"(?<![\w.])" + re.escape(ground_truth) + r"(?![\w.])", answer) is not None
+    pattern = r"(?<!\d)" + re.escape(ground_truth) + r"(?!\d)(?!\.\d)"
+    return re.search(pattern, answer) is not None
 
 
 def judge_row(entry):
@@ -52,6 +58,10 @@ def judge_row(entry):
     livedocs = entry.get("livedocs") or {}
     context7 = entry.get("context7") or {}
     livedocs_current = version_matches(livedocs.get("answer", ""), gt) if gt else None
+    # Symmetric with livedocs: a MISSING context7 judgment is unknown (None),
+    # not silently scored as stale (#27 verify — fairness fix).
+    c7_raw = context7.get("is_current")
+    context7_current = None if c7_raw is None else bool(c7_raw)
     return {
         "id": entry.get("id"),
         "library": entry.get("library"),
@@ -59,14 +69,16 @@ def judge_row(entry):
         "livedocs_answer": livedocs.get("answer"),
         "livedocs_current": livedocs_current,
         "context7_answer": context7.get("answer"),
-        "context7_current": bool(context7.get("is_current")),
+        "context7_current": context7_current,
     }
 
 
 def tally(rows):
-    """Aggregate is_current counts. Rows with unknown (None) livedocs are excluded
-    from the denominator so the rate is only over cases with a ground truth."""
-    scored = [r for r in rows if r.get("livedocs_current") is not None]
+    """Aggregate is_current counts over the *contested* set — rows where BOTH tools
+    have a known judgment. Symmetric: an unknown on either side excludes the row from
+    the shared denominator, so incomplete data never silently favors either tool."""
+    scored = [r for r in rows
+              if r.get("livedocs_current") is not None and r.get("context7_current") is not None]
     return {
         "n": len(scored),
         "livedocs_current": sum(1 for r in scored if r["livedocs_current"]),
@@ -86,10 +98,13 @@ def render_table(rows):
         "|---------|------------------|----------|--------------------------|",
     ]
     for r in rows:
+        # Escape any literal pipe in the free-text context7 answer so it can't break
+        # out of the markdown cell (#27 verify — robustness).
+        c7 = (r["context7_answer"] or "").replace("|", "\\|")
         lines.append(
             f"| {r['library']} | `{r['ground_truth']}` | "
             f"{_cell(r['livedocs_current'])} (`{r['livedocs_answer']}`) | "
-            f"{_cell(r['context7_current'])} ({r['context7_answer']}) |"
+            f"{_cell(r['context7_current'])} ({c7}) |"
         )
     return "\n".join(lines)
 
@@ -113,10 +128,16 @@ def main(argv=None):
 
     if args.verify_live:
         from oracle import fetch_latest_version
+        print("note: --verify-live re-checks the registry (LiveDocs' ground truth) only; "
+              "context7's recorded judgments are a dated snapshot, not re-fetched here.",
+              file=sys.stderr)
         for e, r in zip(results, rows):
-            live = fetch_latest_version(e["library"], e["ecosystem"])
+            lib, eco = e.get("library"), e.get("ecosystem")
+            if not lib or not eco:
+                continue
+            live = fetch_latest_version(lib, eco)
             if live and live != r["ground_truth"]:
-                print(f"⚠ drift: {e['library']} recorded {r['ground_truth']} but registry now {live}",
+                print(f"⚠ drift: {lib} recorded {r['ground_truth']} but registry now {live}",
                       file=sys.stderr)
 
     t = tally(rows)
@@ -124,16 +145,18 @@ def main(argv=None):
         print(json.dumps({"captured_at": sample.get("captured_at"), "tally": t, "rows": rows}, indent=2))
         return 0
 
-    print(f"# LiveDocs vs context7 — latest-version freshness (captured {sample.get('captured_at')})\n")
+    print(f"# LiveDocs vs context7 — freshness on fast-moving libs (captured {sample.get('captured_at')})\n")
     print(render_table(rows))
     print(
-        f"\n**Freshness (exact current version, registry = ground truth):** "
-        f"LiveDocs {t['livedocs_current']}/{t['n']} · "
+        f"\n**Reflects the current release (registry = ground truth, {t['n']} fast-moving libs):** "
+        f"LiveDocs {t['livedocs_current']}/{t['n']} (live registry, by construction) · "
         f"context7 default match {t['context7_current']}/{t['n']}."
     )
-    print("\nHonesty note: freshness only. context7 is a coverage-ranked doc retriever, "
-          "not a version API — it wins on snippet breadth and often carries the current "
-          "version in a lower-ranked entry. This measures the freshness of the *default* answer.")
+    print("\nHonesty note: freshness only, on libraries picked *because* they move fast — a "
+          "re-crawled index's hardest case, not a neutral sample. LiveDocs' side is the registry "
+          "by construction (it fetches it live), so the finding is really context7's default-match "
+          "staleness. context7 wins on doc/snippet breadth (not measured) and often carries the "
+          "current version in a lower-ranked entry.")
     return 0
 
 

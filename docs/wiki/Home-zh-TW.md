@@ -10,14 +10,14 @@
 
 ## 對 context7
 
-「落後於它的重爬」這句是**量測**出來的, 不是嘴的。對六個快速更新的 library(npm / PyPI / crates)問「現在最新版是多少」, 以各套件 registry 為 ground truth, 2026-07-02 實測:LiveDocs **6/6 回傳精確的當前版本**; context7 top-ranked 的預設匹配六個全部落後 —— 例如 React → v18, 而 registry 已在 19.2.7。
+context7 是以覆蓋率排序、週期性重爬的索引; LiveDocs 直接抓 live registry, 所以「現在最新版是多少」這種問題, 它*就是*回傳今天的 release(by construction)。差距顯現在快速更新的 library 上。對六個(npm / PyPI / crates)2026-07-02 實測, context7 top-ranked 的預設匹配反映當前 release 的比例是 **0/6** —— 要嘛落後一個版本(react → v18 對 19.2.7; vite → 8.0.10 對 8.1.3), 要嘛**根本沒版本**(fastapi / pydantic / tokio / serde: top match 是一個沒有版本號的文件頁)。LiveDocs 每次都回傳精確的當前版本。
 
-| 最新版新鮮度 | LiveDocs | context7(預設匹配) |
-|--------------|----------|---------------------|
-| 精確當前版本(6 個 library) | **6/6** | 0/6 |
+| 快速更新 library 上 | LiveDocs | context7(預設匹配) |
+|---------------------|----------|---------------------|
+| 反映當前 release(6 個 library) | 6/6(live registry, by construction) | 0/6 |
 | 來源 | live registry / primary docs | 週期性重爬的索引 |
 
-誠實範圍:這量的是**新鮮度**, 不是文件廣度 —— context7 是以覆蓋率排序的 snippet 檢索器, 廣度是它的主場, 而且當前版本常常存在於某個 lower-ranked 條目裡。方法與逐 library 數據:
+誠實範圍:只量**新鮮度**, 且刻意挑「快速更新」的 library —— 這是重爬索引最吃虧的情境, 不是中立取樣。LiveDocs 那一側 by construction 就是 registry(它即時抓), 所以這裡真正的發現是 context7 預設匹配的過時程度。context7 的主場是文件 / snippet 廣度(這裡不量), 而且當前版本常常存在於某個 lower-ranked 條目裡。方法與逐 library 數據:
 [`evals/docs-router`](https://github.com/PsychQuant/livedocs/tree/main/evals/docs-router)。更深的定位:[對 context7](https://github.com/PsychQuant/livedocs/blob/main/docs/positioning.md)。
 
 ## 安裝
@@ -42,7 +42,7 @@
 
 - [版本協調流程](Version-Reconciliation-zh-TW): 自動偵測更新流程。
 - [Primary-Source 光譜](Primary-Source-Spectrum-zh-TW): LiveDocs 是什麼、不是什麼。
-- [測試](Testing-zh-TW): 測試套件（139 個 test）與各自覆蓋範圍。
+- [測試](Testing-zh-TW): 測試套件（151 個 test）與各自覆蓋範圍。
 
 ## 其他
 

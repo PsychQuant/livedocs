@@ -2,14 +2,14 @@
 
 # Testing
 
-LiveDocs has two independent test suites — **139 tests, all green** (as of v0.7.0). The
-Swift suite verifies the engine; the Python suite verifies that the `docs-router` *skill*
-actually triggers a LiveDocs query and answers currently. Counts below are a snapshot;
-the source of truth is running the suites.
+LiveDocs has two independent test suites — **151 tests, all green**. The Swift suite verifies
+the engine; the Python suite verifies that the `docs-router` *skill* actually triggers a
+LiveDocs query and answers currently, plus the vs-context7 comparison harness. Counts below
+are a snapshot; the source of truth is running the suites.
 
 ```bash
 swift test                                  # 110 Swift tests
-python3 -m pytest evals/docs-router/tests/  # 29 Python eval tests
+python3 -m pytest evals/docs-router/tests/  # 41 Python eval tests
 ```
 
 ## Swift — 110 tests (`swift test`)
@@ -44,15 +44,17 @@ and file-system layer.
 | `RuntimeIntrospectTests` | 7 | Symlink version-file refusal (secret-exfil guard), uncovered-language fallback to the universal pin layer, canonical `mise.toml`, PATH-first executable resolution. |
 | `ProcessRunnerTests` | 4 | Large output doesn't deadlock (concurrent pipe drain), exit code surfaces, timeout reported, SIGTERM→SIGKILL escalation. |
 
-## Python — 29 tests (`pytest evals/docs-router/`)
+## Python — 41 tests (`pytest evals/docs-router/`)
 
 The `docs-router` **skill eval harness** — not a test of the Swift engine, but of whether
-the skill fires a LiveDocs query for varied prompts and answers currently. See
+the skill fires a LiveDocs query for varied prompts and answers currently — plus the
+vs-context7 comparison harness. See
 [`evals/docs-router/README.md`](https://github.com/PsychQuant/livedocs/blob/main/evals/docs-router/README.md).
 
 | File | Tests | Covers |
 |------|------:|--------|
 | `test_run_eval.py` | 12 | Rate-threshold judging, the N=3 threshold-collapse guard, failed-run / inconclusive handling. |
+| `test_compare.py` | 12 | vs-context7 freshness harness: version-token matching (boundary forms), symmetric scoring, table render, corpus↔sample sync. |
 | `test_oracle.py` | 8 | `self_check` (fetch registry at eval time — rot-proof) / `structural` / `golden` oracles. |
 | `test_detect.py` | 7 | `claude -p` stream-json parsing, `is_error` detection, LiveDocs trigger-signal recognition. |
 | `test_corpus.py` | 2 | Corpus coverage guards (a golden case exists + a library-named adversarial negative exists). |
@@ -70,4 +72,4 @@ the skill fires a LiveDocs query for varied prompts and answers currently. See
 Security- and robustness-critical surfaces were built test-first (TDD): `URLSafety`,
 `TextSanitize`, `ProcessRunner`, and the eval harness each had a failing test before the
 implementation. The suite grew 72 → 110 Swift tests during the v0.7.0 hardening (adding the
-previously-untested MCP shell layer), and 0 → 29 for the skill eval.
+previously-untested MCP shell layer), and 0 → 41 for the Python evals (skill eval + vs-context7).

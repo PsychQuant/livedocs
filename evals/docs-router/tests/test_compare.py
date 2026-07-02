@@ -27,8 +27,27 @@ def test_version_matches_contains():
 
 def test_version_matches_mismatch():
     assert version_matches("v18", "19.2.7") is False
-    # a prefix must not count as a match (8.1 must not match 8.1.3)
-    assert version_matches("8.1", "8.1.3") is False
+    # the meaningful boundary direction (#27 verify fix): searching for the shorter
+    # "8.1" inside the longer "8.1.3" must NOT match — a prefix is not the release.
+    assert version_matches("8.1.3", "8.1") is False
+
+
+def test_version_matches_boundary_forms():
+    # v-prefix and @-pinned forms still match the release token
+    assert version_matches("v19.2.7", "19.2.7") is True
+    assert version_matches("react@19.2.7", "19.2.7") is True
+    # a trailing sentence period is fine (not a longer version)
+    assert version_matches("the latest is 19.2.7.", "19.2.7") is True
+
+
+def test_judge_row_context7_missing_is_none():
+    # a MISSING is_current is unknown (None), not silently scored stale (fairness fix)
+    entry = {
+        "id": "x", "library": "x", "ground_truth": "1.0.0",
+        "livedocs": {"answer": "1.0.0"},
+        "context7": {"answer": "no judgment recorded"},   # no is_current key
+    }
+    assert judge_row(entry)["context7_current"] is None
 
 
 def test_version_matches_empty():

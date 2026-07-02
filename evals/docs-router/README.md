@@ -121,16 +121,29 @@ harness lets the data show it and **concedes** what context7 is good at:
 
 - We measure **freshness only**, never **coverage breadth** — a pre-built index's
   home turf; measuring coverage would be reverse cherry-picking.
+- **The corpus is forward-selected** — deliberately fast-moving libraries, where a
+  re-crawled index lags most. This is *not* a neutral sample; it is the case where the
+  difference is real. Stated plainly so the number isn't read as a universal claim.
+- **LiveDocs' side is the registry by construction.** LiveDocs *fetches* the registry,
+  and the ground truth *is* the registry, so `livedocs_current` is effectively
+  tautological (`answer == ground_truth`). That's the point — LiveDocs returns the live
+  release — but it means the real measured finding is **context7's default-match
+  staleness**, not a symmetric contest. The homepage says as much.
 - context7 is a coverage-ranked *doc/snippet retriever*, not a version API. It often
   *has* the current version in a lower-ranked entry; the sample notes that per
   library. We measure the freshness of the **default** answer, not "context7 can't
-  find the version."
+  find the version." Per library the default is either *behind* (react, vite) or
+  *version-less* (fastapi, pydantic, tokio, serde) — the sample records which.
+- **`--verify-live` is one-sided:** it re-fetches the registry (LiveDocs' side) and warns
+  on drift, but does not re-query context7. The context7 column is a dated snapshot;
+  refresh it by re-running both MCP tools.
 - **D1 (this harness):** a dated recorded head-to-head. **D2 (future, not built):**
   a fully-automated live A/B that shells `claude -p` per tool — stronger but
   costly/flaky, so it stays out of the default path.
 
-Result at capture (2026-07-02): LiveDocs returned the exact current version **6/6**;
-context7's top-ranked default match was behind on all six.
+Result at capture (2026-07-02): context7's top-ranked default match reflected the current
+release on **0 of 6** (behind for react/vite, version-less for fastapi/pydantic/tokio/serde);
+LiveDocs returned the live registry version each time.
 
 ## Scope / caveats
 
