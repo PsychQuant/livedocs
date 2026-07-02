@@ -31,7 +31,14 @@ source LiveDocs can read verbatim.
 5. Fallback. context7 / web, always labeled low-fidelity.
 
 Results are ranked fidelity-first, then freshness. An ETag cache revalidates unchanged sources
-cheaply without ever serving stale content.
+cheaply without ever serving stale content; it's bounded (LRU + byte budget) so a long session
+can't grow it without limit.
+
+Every outbound fetch is validated (v0.7.0): an `http(s)` scheme allowlist plus a host classifier
+that rejects loopback / link-local / private / metadata targets — re-checked on each redirect hop
+and against DNS resolution — so a prompt-injection in fetched docs can't steer a request at an
+internal address. Response bodies are streamed under a size ceiling (bounds the decompressed size,
+defeating gzip bombs), and returned text is stripped of control / ANSI / bidi characters.
 
 ## Tools
 
@@ -59,11 +66,30 @@ swift test     # unit tests (pure logic + engine via injected HTTP fakes)
 swift build    # builds the MCP executable
 ```
 
-Status: shipped. 9-ecosystem registry resolution, version pinning, OpenAPI/GraphQL/CLI +
+CI runs `swift build` + `swift test` on every push/PR. `scripts/release.sh` gates the release on a
+green `swift test`, a version-source match against the tag, and Developer ID signing + notarization.
+
+### Skill eval (`evals/docs-router/`)
+
+A Python harness that measures whether the `docs-router` skill actually *fires a LiveDocs query*
+for varied end-user prompts and answers currently — the trigger reliability the whole product
+depends on. The oracle is rot-proof by design (version cases fetch the registry at eval time rather
+than hardcoding a fact), and it's statistical (N runs, rate thresholds).
+
+```bash
+pip install -r evals/docs-router/requirements.txt
+python3 -m pytest evals/docs-router/tests/     # harness unit tests (no API calls)
+python3 evals/docs-router/run_eval.py --dry-run
+python3 evals/docs-router/run_eval.py --runs 5 # live baseline (real `claude -p` calls)
+```
+
+See [`evals/docs-router/README.md`](evals/docs-router/README.md) for the design.
+
+Status: shipped (v0.7.0). 9-ecosystem registry resolution, version pinning, OpenAPI/GraphQL/CLI +
 installed-R + language-runtime introspection (Python/Node/Go/Rust/Java/.NET/Swift, active-toolchain
-authoritative), ETag revalidation cache, and the `docs-router` skill (per-question
-has-local/web-only classification + detect/offer version reconciliation). Signed+notarized release,
-marketplace distribution.
+authoritative), bounded ETag revalidation cache, SSRF-guarded + size-capped fetch, and the
+`docs-router` skill (per-question has-local/web-only classification + detect/offer version
+reconciliation). Signed+notarized release, marketplace distribution.
 
 Design boundary (what LiveDocs is and isn't for): [docs/wiki/Primary-Source-Spectrum.md](docs/wiki/Primary-Source-Spectrum.md).
 
