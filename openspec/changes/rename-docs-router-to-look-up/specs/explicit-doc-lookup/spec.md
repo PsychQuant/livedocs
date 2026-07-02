@@ -4,9 +4,9 @@
 
 The look-up skill SHALL define deterministic routing for explicit invocation with arguments. The first argument token SHALL be classified into exactly one of three shapes — URL, Language, Package — using the following precedence order; CLI introspection is a resolution-time fallback inside the Package shape, not a fourth classification. Subsequent tokens SHALL be treated as a topic filter applied when reading the fetched documentation:
 
-1. URL — the token starts with http:// or https://. The default route is resolve_source with docs_url followed by fetch_docs. The skill SHALL route to introspect (kind openapi or graphql) instead when the URL is explicitly an API schema/endpoint (a path ending in /graphql routes to graphql; paths ending in /openapi.json, /openapi.yaml, or .json route to openapi), or when docs-site resolution returns an empty sources list (then /graphql paths route to graphql and all others to openapi).
+1. URL — the token starts with http:// or https:// (the scheme match is case-insensitive). The default route is resolve_source with docs_url followed by fetch_docs. The skill SHALL route to introspect (kind openapi or graphql) instead only when the path is a named API schema/endpoint (case-insensitive: a path ending in /graphql routes to graphql; paths ending in /openapi.json, /openapi.yaml, /swagger.json, or /swagger.yaml route to openapi), or as a best-effort fallback when docs-site resolution returns an empty sources list (then /graphql paths route to graphql and all others to openapi; when that introspection fails to validate, the skill SHALL report that no docs source was found and SHALL NOT claim the URL is an API schema).
 2. Language — the token case-insensitively matches a fixed supported-language set (r, python, node, javascript, go, rust, java, dotnet, swift). The skill SHALL normalize javascript to node before introspection.
-3. Package — any other token, optionally version-pinned with the name@version form. The version is the substring after the LAST @ character; a leading @ is part of the package name. Ecosystem identification belongs to the invoking agent (the one fuzzy step per the decision flow): npm and pypi auto-detect, and the agent SHALL name every other ecosystem explicitly in the call. CLI fallback: when package resolution returns no sources and the token names an installed command, the skill SHALL instruct CLI introspection.
+3. Package — any other token, optionally version-pinned with the name@version form. An @ character counts as a version separator only when it is not the first character of the token and the suffix after the LAST @ is non-empty; a leading @ is part of the package name, and an empty suffix means no pin. Ecosystem identification belongs to the invoking agent (the one fuzzy step per the decision flow): npm and pypi auto-detect, and the agent SHALL name every other ecosystem explicitly in the call. CLI fallback: when package resolution returns no sources and the token names an installed command, the skill SHALL instruct CLI introspection.
 
 #### Scenario: Language argument anchors to the effective local runtime
 
@@ -62,7 +62,7 @@ The look-up skill SHALL treat explicit invocation with no arguments as a request
 
 ### Requirement: Explicit targets remain subject to engine-layer guards
 
-Explicit invocation SHALL NOT bypass the MCP engine's safety layer: URL targets remain subject to the engine's SSRF host classifier on every outbound fetch, and CLI targets remain subject to the engine's command-safety allowlist and argv-only execution. The skill layer adds routing only.
+Explicit invocation SHALL NOT bypass the MCP engine's safety layer: URL targets remain subject to the engine's SSRF host classifier on every outbound fetch, and CLI targets remain subject to the engine's command-name shape validation, its help/version flag allowlist, and argv-only execution. The skill layer adds routing only.
 
 #### Scenario: Hostile URL target is refused by the engine guard
 

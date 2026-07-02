@@ -66,7 +66,7 @@ defeating gzip bombs), and returned text is stripped of control / ANSI / bidi ch
 |------|---------|
 | `resolve_source` | Ranked primary sources for a library (`library`+`ecosystem` and/or `docs_url`). |
 | `fetch_docs` | Raw verbatim text of a source URL. |
-| `latest_version` | Latest released version + changelog/repo, from the registry (9 ecosystems, version pinning). |
+| `latest_version` | Latest released version + changelog/repo, from the registry (9 ecosystems; version pinning on npm/pypi). |
 | `introspect` | OpenAPI / GraphQL schema, an installed CLI's `--help`, an installed R package's version (`kind:"r-pkg"`), or the effective language-runtime version of the current project (`kind:"runtime"`, Python/Node/Go/Rust/Java/.NET/Swift). Read-only. |
 
 ## Architecture

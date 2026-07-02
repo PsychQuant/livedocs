@@ -117,12 +117,15 @@ Classify the **first** argument token into exactly one of three shapes — **URL
 resolution-time fallback inside the Package shape, not a fourth classification);
 any remaining tokens are a **topic filter** applied when reading the fetched docs:
 
-1. **URL** — token starts with `http://` or `https://`. Default route:
-   `resolve_source{docs_url}` → `fetch_docs`. Route to
-   `introspect{kind:"openapi"|"graphql"}` instead when the URL is explicitly an
-   API schema/endpoint (path ends in `/graphql` → graphql; `/openapi.json`,
-   `/openapi.yaml`, or `.json` → openapi), or when docs-site resolution returns
-   `{"sources":[]}` (then `/graphql` paths → graphql, everything else → openapi).
+1. **URL** — token starts with `http://` or `https://` (scheme match is
+   case-insensitive). Default route: `resolve_source{docs_url}` → `fetch_docs`.
+   Route to `introspect{kind:"openapi"|"graphql"}` instead only when the path is
+   a named API schema/endpoint (case-insensitive: `/graphql` → graphql;
+   `/openapi.json`, `/openapi.yaml`, `/swagger.json`, `/swagger.yaml` → openapi),
+   or as a **best-effort fallback** when docs-site resolution returns
+   `{"sources":[]}` (`/graphql` paths → graphql, everything else → openapi; if
+   that introspection fails to validate, report that no docs source was found —
+   never claim the URL is an API schema).
 2. **Language** — token matches (case-insensitively) one of: r, python, node,
    javascript, go, rust, java, dotnet, swift. Normalize `javascript` → `node`
    before introspecting. Route to `introspect{kind:"runtime", target:<language>}`
@@ -131,10 +134,15 @@ any remaining tokens are a **topic filter** applied when reading the fetched doc
    (no version source in the project, or a language the engine has no runtime
    adapter for — today it probes Python/Node/Go/Rust/Java/.NET/Swift; R has no
    runtime adapter), say so explicitly and answer from web-latest language docs.
-   Never present a guessed version as the local one.
+   Never present a guessed version as the local one. A first token exactly equal
+   to a language name always routes as Language — to look up a package that
+   shares a language name, use its docs URL or ask in prose so the implicit
+   decision flow (with an explicit ecosystem) handles it.
 3. **Package** — any other token, optionally version-pinned as `name@version`.
-   The version is the substring after the **last** `@`; a leading `@` is part of
-   the name (`@types/node` has no pin; `@scope/pkg@1.2.3` pins 1.2.3). Route:
+   An `@` counts as a version separator only when it is not the first character
+   and the suffix after it is non-empty — a leading `@` is part of the name
+   (`@types/node` has no pin; `@scope/pkg@1.2.3` pins 1.2.3; `react@` with an
+   empty suffix means no pin). Route:
    `resolve_source{library, ecosystem, version?}` → `fetch_docs` on the top
    result. Identifying the ecosystem is **your** fuzzy step per **Decision flow**
    step 1: npm/pypi auto-detect, every other ecosystem must be named by you in
@@ -149,16 +157,22 @@ exactly as when the skill fires implicitly, answering subsequent questions per t
 Decision flow. Never error or demand an argument.
 
 URL and CLI targets remain subject to the MCP engine's own guards (SSRF host
-classifier on every outbound fetch; CLI safety allowlist + argv-only execution) —
-this section adds routing, not a bypass of those checks.
+classifier on every outbound fetch; CLI command-name shape validation, a
+`--help`/`--version` flag allowlist, and argv-only execution) — this section
+adds routing, not a bypass of those checks.
 
 Shape examples: `/livedocs:look-up R` → runtime introspect; R currently resolves
 not-resolved (no R runtime adapter) → web-latest R docs with that caveat stated ·
-`/livedocs:look-up react@18` → registry docs pinned to 18 ·
+`/livedocs:look-up javascript` → normalized to `node`, anchored to the local
+Node version · `/livedocs:look-up react@18` → registry docs pinned to 18 ·
+`/livedocs:look-up serde@1.0.100` → you name `ecosystem:"crates"`; registry
+serves latest — state that the pin was not applied ·
 `/livedocs:look-up dplyr mutate` → you name `ecosystem:"cran"`, resolve dplyr,
 read docs for `mutate` · `/livedocs:look-up https://api.example.com/openapi.json`
-→ OpenAPI introspection · `/livedocs:look-up gh` → package miss, falls back to
-CLI introspection.
+→ OpenAPI introspection · `/livedocs:look-up https://hono.dev` → docs-site
+resolution → `fetch_docs` · `/livedocs:look-up gh` → package resolution first (a
+same-named registry package wins deterministically); on a miss with `gh`
+installed → CLI introspection.
 
 ## Examples
 
