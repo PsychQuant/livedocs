@@ -36,7 +36,12 @@ clean non-nested directory with credits.
   Every page is a bilingual pair — `X.md` + `X-zh-TW.md` with a top nav line; edit both.
 - **Test-count sync**: adding/removing tests requires updating the counts on
   `docs/wiki/Testing.md` AND `Testing-zh-TW.md` (headline, code-block comments, per-file
-  table, discipline line) plus the Home pages' Guides line. This regressed twice in one day.
+  table, discipline line) plus the Home pages' Guides line and the README breakdown.
+  This regressed twice in one day — so **run `bash scripts/sync-test-counts.sh`** instead
+  of doing it by hand: it runs both suites, derives the real Swift/Python counts, and
+  idempotently rewrites every headline/per-suite/breakdown reference (still hand-edit the
+  per-file *table rows* — the script only owns the totals). Adding a new count reference to
+  a doc? Add its phrasing to the script's `edits` map so it stays complete.
 - **Competitive claims are measured, never asserted**: any vs-context7 (or similar) number
   must come from the `evals/look-up` harness as a dated capture, with the honesty
   caveats stated inline (forward-selected corpus, LiveDocs-side is the registry by
