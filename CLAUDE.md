@@ -34,14 +34,19 @@ clean non-nested directory with credits.
 
 - **Wiki**: `docs/wiki/` is the source of truth, mirrored 1:1 by `scripts/sync-wiki.sh`.
   Every page is a bilingual pair — `X.md` + `X-zh-TW.md` with a top nav line; edit both.
-- **Test-count sync**: adding/removing tests requires updating the counts on
-  `docs/wiki/Testing.md` AND `Testing-zh-TW.md` (headline, code-block comments, per-file
-  table, discipline line) plus the Home pages' Guides line and the README breakdown.
-  This regressed twice in one day — so **run `bash scripts/sync-test-counts.sh`** instead
-  of doing it by hand: it runs both suites, derives the real Swift/Python counts, and
-  idempotently rewrites every headline/per-suite/breakdown reference (still hand-edit the
-  per-file *table rows* — the script only owns the totals). Adding a new count reference to
-  a doc? Add its phrasing to the script's `edits` map so it stays complete.
+- **Test-count sync**: adding/removing tests changes counts in three places on
+  `docs/wiki/Testing.md` + `Testing-zh-TW.md` — the **totals** (headline, `## Swift`/
+  `## Python`, code-block comments), the **`### <Target> — N` section subtotals**, and the
+  **per-file table rows** — plus the Home pages' Guides line and the README breakdown.
+  This regressed repeatedly, so **run `bash scripts/sync-test-counts.sh`** after every test
+  add/remove: it runs both suites for real (a red suite aborts, never mints a false "all
+  green"), derives the counts, rewrites the totals + breakdown it owns, and then **verifies**
+  the subtotals and per-file rows you hand-edit are internally consistent (rows sum to their
+  subtotal, subtotals sum to the suite total) — **failing loudly** if you forgot to update a
+  row, instead of silently shipping a contradiction. So: hand-edit the `###` subtotals and
+  table rows, then run the script to sync the totals and catch any mismatch. Adding a new
+  count reference elsewhere? Add its phrasing (with an expected hit count) to the script's
+  `edits` map so the guard stays complete.
 - **Competitive claims are measured, never asserted**: any vs-context7 (or similar) number
   must come from the `evals/look-up` harness as a dated capture, with the honesty
   caveats stated inline (forward-selected corpus, LiveDocs-side is the registry by
