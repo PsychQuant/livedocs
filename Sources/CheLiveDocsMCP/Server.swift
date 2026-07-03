@@ -146,26 +146,8 @@ final class CheLiveDocsMCPServer {
             guard let lib = args["library"]?.stringValue else { throw ToolError.missing("library") }
             let eco = args["ecosystem"]?.stringValue.flatMap(Ecosystem.init(rawValue:))
             let pin = args["version"]?.stringValue
-            if let res = await engine.latestVersion(library: lib, ecosystem: eco, version: pin) {
-                // A pin was asked for but the resolved version differs → the pin was
-                // ignored (latest-only ecosystem) or wasn't matched. Say so instead of
-                // passing latest off as the pinned version.
-                if let pin, res.version != pin {
-                    return jsonString([
-                        "version": res.version as Any, "requested": pin,
-                        "note": "Pinned version '\(pin)' not applied — this ecosystem is latest-only (only npm/pypi honor a pin), or the version wasn't found; 'version' is the latest.",
-                        "changelog": res.changelog as Any, "repository": res.repository as Any,
-                        "documentation": res.documentation as Any, "homepage": res.homepage as Any])
-                }
-                return encodeResolution(res)
-            }
-            // A pinned version that didn't resolve: fall back to latest so the agent
-            // learns the current version instead of a bare null.
-            if let pin, let latest = await engine.latestVersion(library: lib, ecosystem: eco) {
-                return jsonString(["version": NSNull(), "requested": pin, "latest": latest.version as Any,
-                                   "note": "Version \(pin) not found; current latest shown under 'latest'."])
-            }
-            return #"{"version":null,"note":"Not found. For crates/go/rubygems/jsr/packagist/maven you must pass ecosystem explicitly (and the right library format)."}"#
+            let res = await engine.latestVersion(library: lib, ecosystem: eco, version: pin)
+            return encodeLatestVersion(res, library: lib, pin: pin, eco: eco)
 
         case "introspect":
             guard let target = args["target"]?.stringValue else { throw ToolError.missing("target") }
@@ -232,7 +214,7 @@ final class CheLiveDocsMCPServer {
         return jsonString(["sources": arr])
     }
 
-    private func encodeResolution(_ r: RegistryResolution) -> String {
+    private func encodeResolution(_ r: RegistryResolution, note: String? = nil) -> String {
         var obj: [String: Any] = [
             "version": r.version as Any,
             "changelog": r.changelog as Any,
@@ -244,7 +226,37 @@ final class CheLiveDocsMCPServer {
         // actually requested (nil = no pin asked) so agents get a machine-readable
         // signal instead of parsing note text (issue #36).
         if let honored = r.pinHonored { obj["pin_honored"] = honored }
+        if let note { obj["note"] = note }
         return jsonString(obj)
+    }
+
+    /// Build the `latest_version` tool response. Decides honored-vs-not from
+    /// `pinHonored` (NOT string equality — Go pins carry a `v` prefix, so
+    /// `version != pin` would misread a confirmed pin as not-applied), and always
+    /// routes through `encodeResolution` so the `pin_honored` signal reaches the
+    /// caller in every case, not just the exact-match one (issue #36 verify).
+    /// `internal` (not private) so the boundary logic is unit-testable without the
+    /// MCP transport layer.
+    func encodeLatestVersion(_ res: RegistryResolution?, library: String, pin: String?, eco: Ecosystem?) -> String {
+        guard let res else {
+            // No resolution at all — package (or its whole registry) not found.
+            if let pin {
+                return jsonString(["version": NSNull(), "requested": pin,
+                                   "note": "Not found for '\(library)'. Pass the right ecosystem (crates/go/rubygems/jsr/packagist/maven need it explicitly) and library format."])
+            }
+            return #"{"version":null,"note":"Not found. For crates/go/rubygems/jsr/packagist/maven you must pass ecosystem explicitly (and the right library format)."}"#
+        }
+        // A pin was requested but not honored → attach an accurate, ecosystem-aware
+        // note alongside the machine-readable pin_honored:false. Auto-detect (nil
+        // eco) only tries npm/pypi, which DO support pins → treat as pin-supporting.
+        if let pin, res.pinHonored == false {
+            let latestOnly = !(eco?.supportsVersionPin ?? true)
+            let reason = latestOnly
+                ? "this ecosystem is latest-only (jsr/packagist/maven/cran)"
+                : "the version wasn't found in this ecosystem"
+            return encodeResolution(res, note: "Pin '\(pin)' not applied — \(reason); 'version' is the latest. npm/pypi/crates/go/rubygems honor a confirmed pin.")
+        }
+        return encodeResolution(res)
     }
 
     private func encodeOpenAPI(_ s: OpenAPISummary) -> String {
