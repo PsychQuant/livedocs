@@ -66,7 +66,7 @@ final class CheLiveDocsMCPServer {
             ),
             Tool(
                 name: "latest_version",
-                description: "The deterministic 'what is the latest released version right now' answer for a library, from its package registry, plus changelog/repo URLs. This is the strongest currency signal — more reliable than scraping a docs page. When you pass a version pin, the response includes pin_honored (true = confirmed at the ecosystem's per-version endpoint and 'version' is the pin; false = latest-only ecosystem or version not found, 'version' is latest).",
+                description: "The deterministic 'what is the latest released version right now' answer for a library, from its package registry, plus changelog/repo URLs. This is the strongest currency signal — more reliable than scraping a docs page. When you pass a version pin, the response includes pin_honored (true = confirmed at the ecosystem's per-version endpoint and 'version' is the pin; false = the pin was not confirmed as an exact version — a latest-only ecosystem, an unknown version, or a non-exact token like an npm dist-tag/partial version. On false, 'version' is the registry's current resolution, which may be the latest OR the concrete version a tag/partial resolved to — NOT guaranteed to be the latest stable, and not a confirmed pin).",
                 inputSchema: .object([
                     "type": .string("object"),
                     "properties": .object([
@@ -240,8 +240,12 @@ final class CheLiveDocsMCPServer {
     func encodeLatestVersion(_ res: RegistryResolution?, library: String, pin: String?, eco: Ecosystem?) -> String {
         guard let res else {
             // No resolution at all — package (or its whole registry) not found.
+            // A pin was requested but couldn't be honored (there's nothing to pin
+            // to), so still emit pin_honored:false — a requested pin ALWAYS gets a
+            // machine-readable signal, never absent (which would read as "no pin
+            // asked"). Issue #36 round-3.
             if let pin {
-                return jsonString(["version": NSNull(), "requested": pin,
+                return jsonString(["version": NSNull(), "requested": pin, "pin_honored": false,
                                    "note": "Not found for '\(library)'. Pass the right ecosystem (crates/go/rubygems/jsr/packagist/maven need it explicitly) and library format."])
             }
             return #"{"version":null,"note":"Not found. For crates/go/rubygems/jsr/packagist/maven you must pass ecosystem explicitly (and the right library format)."}"#

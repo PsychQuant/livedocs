@@ -152,11 +152,15 @@ any remaining tokens are a **topic filter** applied when reading the fetched doc
    the call (e.g. `dplyr` → `ecosystem:"cran"`). Version pins are honored by the
    npm/pypi/crates/go/rubygems registry legs (each confirmed at its per-version
    endpoint); jsr/packagist/maven/cran serve latest only. `latest_version`
-   returns `pin_honored` (true = the pin was confirmed and `version` is the pin;
-   false = latest-only ecosystem or version not found) — trust that boolean
-   rather than guessing, and note when a pin was not applied. Either way the
-   docs/repo URLs remain latest (default-branch), so llms/repo sources stay
-   labeled not-pinned even for a honored registry pin.
+   returns `pin_honored` (true = the pin was confirmed and `version` is exactly
+   the pin; false = latest-only ecosystem, version not found, or a non-exact
+   token such as an npm dist-tag / partial version). On `false`, `version` is the
+   registry's current resolution — which may be the latest OR the concrete
+   version a tag/partial resolved to (e.g. a prerelease), so don't present a
+   `pin_honored:false` version as the latest stable. Trust that boolean rather
+   than guessing, and say when a pin was not applied. Either way the docs/repo
+   URLs remain latest (default-branch), so llms/repo sources stay labeled
+   not-pinned even for a honored registry pin.
    **CLI fallback**: package resolution returned `{"sources":[]}` AND the token
    names an installed command → `introspect{kind:"cli", target:<token>}`.
 

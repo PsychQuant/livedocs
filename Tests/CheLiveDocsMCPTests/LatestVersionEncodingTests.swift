@@ -68,6 +68,14 @@ final class LatestVersionEncodingTests: XCTestCase {
         let obj = parse(server().encodeLatestVersion(nil, library: "nope", pin: "1.0.0", eco: .crates))
         XCTAssertTrue(obj["version"] is NSNull)
         XCTAssertEqual(obj["requested"] as? String, "1.0.0")
+        // A requested pin ALWAYS gets a machine-readable signal, even when nothing
+        // resolved — absent pin_honored would read as "no pin asked" (round-3).
+        XCTAssertEqual(obj["pin_honored"] as? Bool, false)
+    }
+
+    func testNilResolutionNoPinOmitsPinHonored() {
+        let obj = parse(server().encodeLatestVersion(nil, library: "nope", pin: nil, eco: .crates))
+        XCTAssertNil(obj["pin_honored"], "no pin asked → no pin_honored even in the not-found path")
     }
 
     // MARK: - CRITICAL: Go v-prefixed confirmed pin must NOT read as "not applied"

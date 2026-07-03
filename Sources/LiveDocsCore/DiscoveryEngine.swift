@@ -161,8 +161,16 @@ public struct DiscoveryEngine: Sendable {
         if let v = version, !isSafeVersion(v) { return nil }
 
         let order = ecosystem.map { [$0] } ?? Ecosystem.autoOrder
-        for eco in order {
-            if var res = await fetchRegistry(eco: eco, library: library, version: version) {
+        let isAutoDetect = ecosystem == nil
+        for (idx, eco) in order.enumerated() {
+            // Auto-detect ([.npm, .pypi]): a pinned-version MISS on an earlier
+            // ecosystem must NOT short-circuit to that ecosystem's latest — the
+            // next ecosystem might have the exact pin. Only the last ecosystem in
+            // the chain (or any explicit ecosystem) falls back to latest+false, so
+            // we never return a wrong-package latest while a real pin exists on the
+            // next registry (issue #36 round-3).
+            let allowFallback = !isAutoDetect || idx == order.count - 1
+            if var res = await fetchRegistry(eco: eco, library: library, version: version, fallbackToLatest: allowFallback) {
                 // Latest-only ecosystems: a requested pin could not be honored.
                 // Say so explicitly instead of leaving the signal absent (issue #36).
                 if version != nil, !eco.supportsVersionPin { res.pinHonored = false }
@@ -176,19 +184,21 @@ public struct DiscoveryEngine: Sendable {
     /// has a first-class per-version endpoint (npm/PyPI directly; crates/Go/
     /// RubyGems via a confirm probe) — `pinHonored` records the outcome. Where a
     /// pin can't be confirmed we return latest with `pinHonored=false`, never a
-    /// faked pin (issue #36).
-    private func fetchRegistry(eco: Ecosystem, library: String, version: String?) async -> RegistryResolution? {
+    /// faked pin (issue #36). `fallbackToLatest` is false only for a non-last
+    /// ecosystem during auto-detect, so a pinned miss yields nil and the loop
+    /// continues instead of short-circuiting.
+    private func fetchRegistry(eco: Ecosystem, library: String, version: String?, fallbackToLatest: Bool) async -> RegistryResolution? {
         switch eco {
         case .npm:
             return await fetchDirectPin(
                 pinnedURL: { "https://registry.npmjs.org/\(library)/\($0)" },
                 latestURL: "https://registry.npmjs.org/\(library)/latest",
-                parse: parseNpmLatest, version: version)
+                parse: parseNpmLatest, version: version, fallbackToLatest: fallbackToLatest)
         case .pypi:
             return await fetchDirectPin(
                 pinnedURL: { "https://pypi.org/pypi/\(library)/\($0)/json" },
                 latestURL: "https://pypi.org/pypi/\(library)/json",
-                parse: parsePyPI, version: version)
+                parse: parsePyPI, version: version, fallbackToLatest: fallbackToLatest)
         case .crates:
             return await fetchWithPinConfirm(
                 latestURL: "https://crates.io/api/v1/crates/\(library)", latestParse: parseCratesIo,
@@ -242,13 +252,17 @@ public struct DiscoveryEngine: Sendable {
     /// to latest with pinHonored=false, never a bare nil that hides the outcome.
     private func fetchDirectPin(
         pinnedURL: (String) -> String, latestURL: String,
-        parse: (Data) throws -> RegistryResolution, version: String?
+        parse: (Data) throws -> RegistryResolution, version: String?, fallbackToLatest: Bool
     ) async -> RegistryResolution? {
         guard let pin = version else { return await getParse(latestURL, parse) }
         if var res = await getParse(pinnedURL(stripLeadingV(pin)), parse) {
             res.pinHonored = res.version.map { versionsEqual($0, pin) } ?? false
             return res
         }
+        // The pinned version wasn't found. During auto-detect on a non-last
+        // ecosystem, return nil so the loop tries the next registry's exact pin
+        // instead of short-circuiting to this one's latest (issue #36 round-3).
+        guard fallbackToLatest else { return nil }
         guard var latest = await getParse(latestURL, parse) else { return nil }
         latest.pinHonored = false
         return latest

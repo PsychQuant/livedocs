@@ -151,4 +151,38 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(res?.version, "v1.9.1")
         XCTAssertEqual(res?.pinHonored, true)
     }
+
+    func testLatestOnlyEcosystemSetsPinHonoredFalseAtEngine() async {
+        // Drive the actual `!eco.supportsVersionPin → pinHonored=false` engine line
+        // (CRAN is latest-only), not just the server-encoding shortcut (round-3).
+        let http = FakeHTTP(routes: [
+            "https://crandb.r-pkg.org/dplyr":
+                HTTPResponse(status: 200, contentType: "application/json",
+                             body: Data(#"{"Version":"1.1.4","URL":"https://github.com/tidyverse/dplyr"}"#.utf8)),
+        ])
+        let res = await DiscoveryEngine(http: http).latestVersion(library: "dplyr", ecosystem: .cran, version: "1.0.0")
+        XCTAssertEqual(res?.version, "1.1.4")
+        XCTAssertEqual(res?.pinHonored, false)   // requested a pin on a latest-only ecosystem
+    }
+
+    func testAutoDetectFallsThroughToPyPIOnNpmPinMiss() async {
+        // A name that exists on npm (but NOT at the pinned version) AND on PyPI at
+        // the exact pin. Auto-detect must not short-circuit to npm's latest — it
+        // must try PyPI's exact pin (round-3: pinned-miss on a non-last ecosystem
+        // returns nil to preserve fall-through).
+        let http = FakeHTTP(routes: [
+            // npm has the package but not 2.0.0 → per-version 404, latest present
+            "https://registry.npmjs.org/foo/latest":
+                HTTPResponse(status: 200, contentType: "application/json", body: Data(#"{"version":"1.0.0"}"#.utf8)),
+            // PyPI has the exact pinned version
+            "https://pypi.org/pypi/foo/2.0.0/json":
+                HTTPResponse(status: 200, contentType: "application/json",
+                             body: Data(#"{"info":{"version":"2.0.0","project_urls":{"Repository":"https://github.com/py/foo"}}}"#.utf8)),
+        ])
+        // ecosystem: nil → auto-detect [.npm, .pypi]
+        let res = await DiscoveryEngine(http: http).latestVersion(library: "foo", ecosystem: nil, version: "2.0.0")
+        XCTAssertEqual(res?.version, "2.0.0", "must resolve PyPI's exact pin, not npm's latest 1.0.0")
+        XCTAssertEqual(res?.pinHonored, true)
+        XCTAssertEqual(res?.repository, "https://github.com/py/foo")
+    }
 }
