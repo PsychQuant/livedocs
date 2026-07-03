@@ -49,7 +49,8 @@ upgrade prompt. A bare conceptual question with no consuming project → skip th
 1. installed **package**: `introspect{kind:"r-pkg", target:"<pkg>"}` (R; npm/pip to come) —
    `resolved_env` says which library answered.
 2. installed **CLI**: `introspect{kind:"cli", target:"<cmd>"}`.
-3. **language runtime** (Python / Node / Go / Rust / Java / .NET / Swift):
+3. **language runtime** (Python / Node / Go / Rust / Java / .NET / Swift / R;
+   `javascript` aliases to node):
    `introspect{kind:"runtime", target:"<language>" or "auto"}` → the *effective* runtime version.
    Active toolchain is authoritative; declared pins (`.python-version`, `go.mod` `go`,
    `swift-tools-version`, …) only cross-check; a bare constraint or a language-mode declaration

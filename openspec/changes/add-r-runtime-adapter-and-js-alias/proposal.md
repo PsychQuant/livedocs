@@ -5,7 +5,7 @@ look-up 的旗艦例 `/livedocs:look-up R` 目前只能走誠實降級（not-res
 ## What Changes
 
 - RuntimeLanguage enum 新增 case r；adapter：probeCommands ["R", "Rscript"]（順序 fallback）+ probeArg --version、idiomaticFile .r-version、manifestFile DESCRIPTION（新增 parseRDescription 讀 Depends: R (>= x)，依既有 **constraint** semantics 不當 exact）
-- detectLanguages 新增 R 訊號：DESCRIPTION / renv.lock / .r-version 任一存在，或 *.Rproj 後綴
+- detectLanguages 新增 R 訊號：DESCRIPTION + NAMESPACE 同時存在（裸 DESCRIPTION 訊號太弱、非 R 專案也可能有），或 renv.lock / .r-version 任一存在，或 *.Rproj / *.rproj 後綴
 - 版本解析不需新 parser：既有 firstVersionToken 已覆蓋 "R version 4.4.1 (…)" 與 "Rscript (R) version 4.4.1" 兩種輸出（以測試鎖定）
 - resolve() 入口 javascript → node alias：languageId 回傳請求原 id "javascript"，resolution 走 node adapter（source 欄位天然揭露 node probe，零 schema 變更）
 - Spec MODIFIED deltas ×2：runtime-version-introspection 的 coverage requirement（7 → 8 語言 + alias 條款）；explicit-doc-lookup 的 Language 路由 requirement（R 改 supported、alias 措辭、not-resolved 降級對其他無 adapter 語言保留）
