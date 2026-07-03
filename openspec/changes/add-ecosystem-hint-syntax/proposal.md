@@ -10,10 +10,18 @@ look-up 的 explicit-doc-lookup 契約把第一個 argument token 分成三形�
 ## What Changes
 
 - 新增 **`eco:name` 前綴 hint 語法**：`cran:dplyr`、`npm:go`、`crates:serde@1.0.100`。`<known-ecosystem>:` 前綴集合有限可枚舉，deterministic。
-- **與 URL scheme 的 disambiguation 規則**：token 以 `<known-ecosystem>:` 開頭**且** `:` 後第一個字元不是 `/`（即非 `//`）→ 判為 hint；否則走 URL 規則（`http://`、`https://`）。
+- **disambiguation 規則（三條件）**：在**第一個 `:`** 切一次，(a) 前綴 case-insensitively 等於某個 known ecosystem、(b) remainder 非空、(c) remainder 首字非 `/` → 判為 hint；任一不成立則整個 token（含冒號）落到 URL/Language/Package。條件 (c) 把 hint 與 URL scheme（`npm://x` 的 `:` 後接 `//`）分開；條件 (b) 讓裸 `npm:`/`cran:` 不算 hint。remainder **逐字**當套件名、不再重跑分類，故含冒號的 Maven coordinate（`maven:group:artifact`）保持完整。
 - **precedence 插在 URL 之後、Language 之前**：hint 是使用者的顯式意圖，勝過 Language 固定集的遮蔽（`go:` 前綴的 `go` 走 Package/該生態系，而非 Language runtime introspect）。
 - hint 與既有 version pin 正交組合：`crates:serde@1.0.100` → ecosystem crates + version 1.0.100（沿用既有 `name@version` 解析）。
 - **同步更新既有 pin scenario 以對齊 #36 已出貨行為**：published spec 目前的 scenario「Version pin outside npm/pypi is surfaced as not applied」在 #36（crates/go/rubygems 已 honor pin、回 pin_honored）之後為**假**；本 change 的 MODIFIED Requirement 1 必須整段重寫，藉此把該 scenario 改為描述 pin_honored 誠實 surfacing（crates/go/rubygems honor；jsr/packagist/maven/cran latest-only），一併消除 #36 遺留的 spec drift（#36 為 Plan-tier、未帶 spec delta）。
+
+## Ordering / dependency（跨 change 同 requirement 協調）
+
+本 change **依賴** `add-r-runtime-adapter-and-js-alias`（issue #35）。**兩個 change 都對同一個 Requirement「Explicit invocation routes deterministically by argument shape」帶 MODIFIED delta**：#35 的版本是三形態（URL/Language/Package）+ R runtime 更新；本 change 的版本是四形態（加 ecosystem-hint）+ 相同的 R runtime 更新（我在撰寫時**已把 #35 的整段內容納入為基底**再疊加 hint）——即本 change 的 delta 是 #35 delta 的**嚴格 superset**。
+
+- **為什麼安全**：三個 change 以 stacked branch 疊放（`idd/35` ← `idd/36` ← `idd/37`），git 強制 merge 順序為 #35 → #36 → #37。Spectra 的 MODIFIED delta 在 archive 時**整段取代** requirement，故只要 archive 順序跟隨 merge 順序（依賴序，#37 最後），最終 published spec 就是本 change 的四形態 superset。
+- **唯一風險與規避**：若有人**逆序** archive（先 #37 後 #35），#35 的三形態 delta 會把本 change 覆蓋掉、連帶還原 #36 已消除的舊 pin scenario。規避：archive **必須**跟隨 stacked 依賴序（#35 → #37）；本 change 的 delta 為權威 superset，如遇疑義以本 change 為準。此約束在 verify report 與 PR body 明確標註。
+- **mitigants**：純 prose（無 runtime 影響）；且 agent 實際執行的是 SKILL.md，不論 spec archive 順序皆正確。
 - SKILL.md 分類規則新增 hint 步驟、shape examples 新增 hint 列、把「同名遮蔽」段落改寫為指向 hint escape hatch。
 - CHANGELOG entry + plugin shell minor version bump（skill 契約變更；MCP binary 不變）。
 

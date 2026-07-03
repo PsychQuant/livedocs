@@ -128,19 +128,24 @@ when reading the fetched docs:
    `{"sources":[]}` (`/graphql` paths → graphql, everything else → openapi; if
    that introspection fails to validate, report that no docs source was found —
    never claim the URL is an API schema).
-2. **Ecosystem hint** — token of the form `<ecosystem>:<name>` where `<ecosystem>`
-   is **exactly one** of the known ecosystem ids (`npm`, `pypi`, `crates`, `go`,
-   `rubygems`, `jsr`, `packagist`, `maven`, `cran`) **and** the character right
-   after the first `:` is **not** `/` (that trailing-slash exclusion is what
-   separates a hint from a URL scheme, whose `:` is followed by `//`). Strip the
-   `<ecosystem>:` prefix, use `<ecosystem>` as the named ecosystem, and classify
-   the remaining `<name>` as a **Package** (rule 4 — including any `name@version`
-   pin on the remainder). This is the explicit **escape hatch**: it *overrides*
-   Language-set shadowing (`npm:go` → the npm package `go`, **not** the Go
-   runtime) and names the ecosystem for named-only registries (`cran:dplyr`). A
-   prefix that is not a known ecosystem is **not** a hint — it falls through to
-   Language or Package. The hint selects a package ecosystem only; it never routes
-   to a URL, a CLI, or a runtime.
+2. **Ecosystem hint** — split the token **once at the first `:`** into a prefix
+   and a remainder; it is a hint only when **all** hold: (a) the prefix matches
+   (**case-insensitively**) one of the known ecosystem ids (`npm`, `pypi`,
+   `crates`, `go`, `rubygems`, `jsr`, `packagist`, `maven`, `cran`); (b) the
+   remainder is **non-empty**; (c) the remainder's first character is **not** `/`.
+   (c) separates a hint from a URL scheme (`npm://x`'s `:` is followed by `//`);
+   (b) means a bare `npm:` / `cran:` is **not** a hint; a non-ecosystem prefix
+   (`foo:bar`, `C:\path`) is **not** a hint. In every not-a-hint case pass the
+   **whole** token (colon included) through to Language then Package. When it IS a
+   hint, lowercase the prefix as the named ecosystem and classify the remainder as
+   a **Package** (rule 4) — the remainder is the package identifier **verbatim**,
+   never re-checked as a URL/hint/Language/CLI, so a remainder that itself has
+   colons (a Maven coordinate `maven:com.google.guava:guava`) stays intact, and a
+   `name@version` pin on the remainder is applied per rule 4. This is the explicit
+   **escape hatch**: it *overrides* Language-set shadowing (`npm:go` → the npm
+   package `go`, **not** the Go runtime) and names the ecosystem for named-only
+   registries (`cran:dplyr`). The hint selects a package ecosystem only; it never
+   routes to a URL, a CLI, or a runtime.
 3. **Language** — token matches (case-insensitively) one of: r, python, node,
    javascript, go, rust, java, dotnet, swift. The engine treats `javascript` as
    an alias of `node` — pass the requested identifier through; the resolution
@@ -157,9 +162,10 @@ when reading the fetched docs:
    `cran:r`, `crates:swift`.
 4. **Package** — any other token, optionally version-pinned as `name@version`.
    An `@` counts as a version separator only when it is not the first character
-   and the suffix after it is non-empty — a leading `@` is part of the name
-   (`@types/node` has no pin; `@scope/pkg@1.2.3` pins 1.2.3; `react@` with an
-   empty suffix means no pin). Route:
+   and the suffix after the **LAST** `@` is non-empty — a leading `@` is part of
+   the name (`@types/node` has no pin; `@scope/pkg@1.2.3` pins 1.2.3;
+   `foo@bar@baz` → name `foo@bar`, version `baz`; `react@` with an empty suffix
+   means no pin and the trailing `@` is stripped → library `react`). Route:
    `resolve_source{library, ecosystem, version?}` → `fetch_docs` on the top
    result. Identifying the ecosystem is **your** fuzzy step per **Decision flow**
    step 1: npm/pypi auto-detect, every other ecosystem must be named by you in
