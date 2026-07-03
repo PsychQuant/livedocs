@@ -10,9 +10,9 @@
 
 ## 3. 對外文件同步
 
-- [ ] 3.1 [P] Sources/CheLiveDocsMCP/Server.swift 的 introspect 工具描述 — 語言清單加 R、註明 javascript aliases to node。驗證：swift build 過 + 描述字串 grep 到 R 與 alias。
-- [ ] 3.2 [P] plugins/livedocs/skills/look-up/SKILL.md — Explicit invocation 的 Language 段落與 Version reconciliation 段落：R 改為 supported（移除「R has no runtime adapter」降級文字、保留其他無 adapter 語言的 not-resolved 誠實路徑）、javascript alias 措辭改引擎層；Shape examples 的 R 列改 anchored。交付 spec requirement「Explicit invocation routes deterministically by argument shape」的 MODIFIED Language 條款。驗證：內容審查對照 explicit-doc-lookup MODIFIED delta 的 Example 表逐列一致；grep SKILL.md 無「no R runtime adapter」殘留。
-- [ ] 3.3 [P] CHANGELOG.md 新 entry（Unreleased 或版本標題由 release train 決定）：R depth adapter + javascript alias，註明 binary 發布與 #36 共 train。驗證：git diff 僅新增行。
+- [x] 3.1 [P] Sources/CheLiveDocsMCP/Server.swift 的 introspect 工具描述 — 語言清單加 R、註明 javascript aliases to node。驗證：swift build 過 + 描述字串 grep 到 R 與 alias。
+- [x] 3.2 [P] plugins/livedocs/skills/look-up/SKILL.md — Explicit invocation 的 Language 段落與 Version reconciliation 段落：R 改為 supported（移除「R has no runtime adapter」降級文字、保留其他無 adapter 語言的 not-resolved 誠實路徑）、javascript alias 措辭改引擎層；Shape examples 的 R 列改 anchored。交付 spec requirement「Explicit invocation routes deterministically by argument shape」的 MODIFIED Language 條款。驗證：內容審查對照 explicit-doc-lookup MODIFIED delta 的 Example 表逐列一致；grep SKILL.md 無「no R runtime adapter」殘留。
+- [x] 3.3 [P] CHANGELOG.md 新 entry（Unreleased 或版本標題由 release train 決定）：R depth adapter + javascript alias，註明 binary 發布與 #36 共 train。驗證：git diff 僅新增行。
 
 ## 4. 全量驗證
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+- **R runtime depth adapter** — `introspect kind=runtime` now covers R: probes `R` (falling back to `Rscript`) `--version`, reads `DESCRIPTION`'s `Depends: R (>= x.y)` as a **constraint** (lower bound, never an exact version), honors `.r-version`, and auto-detects R projects via `DESCRIPTION` / `renv.lock` / `.r-version` / `*.Rproj`. The `look-up` flagship example `/livedocs:look-up R` now anchors to the local R version instead of degrading to web-latest.
+- **`javascript` → `node` alias** — runtime introspection with `target=javascript` resolves through the Node adapter; the result keeps the requested identifier and the source field discloses the node probe. No response-schema change.
+- Binary release for this entry ships together with the version-pin work (#36) in one signed release train.
+
 ## [0.8.0]
 
 **BREAKING**: the plugin skill `docs-router` is renamed to `look-up` — the explicit command moves from `/livedocs:docs-router` to `/livedocs:look-up`. The skill was always dual-mode (Claude Code default); the old name described internal mechanics and made the explicit entry undiscoverable. The frontmatter description is unchanged, so implicit auto-fire behavior is identical. Migration: invoke `/livedocs:look-up` instead of `/livedocs:docs-router`; no other action needed.

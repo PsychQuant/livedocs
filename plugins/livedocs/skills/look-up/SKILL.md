@@ -127,13 +127,15 @@ any remaining tokens are a **topic filter** applied when reading the fetched doc
    that introspection fails to validate, report that no docs source was found —
    never claim the URL is an API schema).
 2. **Language** — token matches (case-insensitively) one of: r, python, node,
-   javascript, go, rust, java, dotnet, swift. Normalize `javascript` → `node`
-   before introspecting. Route to `introspect{kind:"runtime", target:<language>}`
-   and anchor language/stdlib answers to the effective local version per
-   **Version reconciliation** above. When the runtime comes back **not resolved**
-   (no version source in the project, or a language the engine has no runtime
-   adapter for — today it probes Python/Node/Go/Rust/Java/.NET/Swift; R has no
-   runtime adapter), say so explicitly and answer from web-latest language docs.
+   javascript, go, rust, java, dotnet, swift. The engine treats `javascript` as
+   an alias of `node` — pass the requested identifier through; the resolution
+   source discloses the node probe. Route to `introspect{kind:"runtime",
+   target:<language>}` and anchor language/stdlib answers to the effective local
+   version per **Version reconciliation** above. When the runtime comes back
+   **not resolved** (no version source in the project, or a language the engine
+   has no runtime adapter for — today it probes
+   Python/Node/Go/Rust/Java/.NET/Swift/R), say so explicitly and answer from
+   web-latest language docs.
    Never present a guessed version as the local one. A first token exactly equal
    to a language name always routes as Language — to look up a package that
    shares a language name, use its docs URL or ask in prose so the implicit
@@ -161,10 +163,11 @@ classifier on every outbound fetch; CLI command-name shape validation, a
 `--help`/`--version` flag allowlist, and argv-only execution) — this section
 adds routing, not a bypass of those checks.
 
-Shape examples: `/livedocs:look-up R` → runtime introspect; R currently resolves
-not-resolved (no R runtime adapter) → web-latest R docs with that caveat stated ·
-`/livedocs:look-up javascript` → normalized to `node`, anchored to the local
-Node version · `/livedocs:look-up react@18` → registry docs pinned to 18 ·
+Shape examples: `/livedocs:look-up R` → runtime introspect via the R depth
+adapter (probes R/Rscript, DESCRIPTION `Depends` cross-checks as a constraint),
+R docs anchored to the local R version ·
+`/livedocs:look-up javascript` → engine alias to the `node` adapter, anchored to
+the local Node version · `/livedocs:look-up react@18` → registry docs pinned to 18 ·
 `/livedocs:look-up serde@1.0.100` → you name `ecosystem:"crates"`; registry
 serves latest — state that the pin was not applied ·
 `/livedocs:look-up dplyr mutate` → you name `ecosystem:"cran"`, resolve dplyr,
