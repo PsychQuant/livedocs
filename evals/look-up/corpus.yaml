@@ -184,6 +184,10 @@
   category: explicit
   expected_trigger: true
   expected_tools: [introspect]
+  # A language token routes to runtime introspection — a wrong kind (cli / r-pkg)
+  # fires the same introspect tool; pin kind=runtime to catch a mis-routed kind.
+  expected_args:
+    introspect: {kind: runtime}
   oracle: {type: structural}
 
 - id: explicit-lookup-pin-en
@@ -223,6 +227,11 @@
   category: explicit
   expected_trigger: true
   expected_tools: [introspect]
+  # A named openapi.json path is a schema introspection, NOT a CLI/graphql: the
+  # kind arg is contract-mandated (SKILL rule 1). introspect firing with the
+  # wrong kind slips past the tool-name route check (issue #38 fix verify).
+  expected_args:
+    introspect: {kind: openapi}
   oracle: {type: structural}
 
 - id: explicit-lookup-js-alias-en
@@ -231,6 +240,13 @@
   category: explicit
   expected_trigger: true
   expected_tools: [introspect]
+  # A language token routes to runtime introspection — a wrong kind (cli/r-pkg)
+  # fires the same introspect tool and would pass a name-only route check. We pin
+  # kind=runtime (stable) but NOT target: the js→node normalization target value
+  # changed across the R-adapter change (node vs passthrough javascript), so a
+  # version-stable corpus pins only the invariant kind (issue #38 fix verify).
+  expected_args:
+    introspect: {kind: runtime}
   oracle: {type: structural}
 
 - id: explicit-lookup-scoped-pin-en
@@ -258,10 +274,14 @@
   category: explicit
   expected_trigger: true
   expected_tools: [resolve_source, fetch_docs]
-  # Ecosystem (crates) MUST be named AND the pin passed: a dropped ecosystem or a
-  # dropped/mis-applied version fires the same tool but is wrong (issue #38 verify).
+  # Ecosystem (crates) MUST be named — a dropped ecosystem fires the same tool but
+  # resolves wrong (the load-bearing catcher). `version` is intentionally NOT
+  # asserted: for a non-npm/pypi pin the skill may legitimately omit the version
+  # from the call (the registry serves latest and the answer states the pin was
+  # not applied), so asserting it would false-fail a contract-correct run
+  # (issue #38 fix verify — over-assert guard).
   expected_args:
-    resolve_source: {library: serde, ecosystem: crates, version: "1.0.100"}
+    resolve_source: {library: serde, ecosystem: crates}
   oracle: {type: structural}
 
 - id: explicit-lookup-shadow-gh-en

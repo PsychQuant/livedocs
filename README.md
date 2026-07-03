@@ -98,7 +98,7 @@ than hardcoding a fact), and it's statistical (N runs, rate thresholds).
 
 ```bash
 pip install -r evals/look-up/requirements.txt
-python3 -m pytest evals/look-up/tests/     # 44 harness unit tests (no API calls)
+python3 -m pytest evals/look-up/tests/     # 50 harness unit tests (no API calls)
 python3 evals/look-up/run_eval.py --dry-run
 python3 evals/look-up/run_eval.py --runs 5 # live baseline (real `claude -p` calls)
 ```

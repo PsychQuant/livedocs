@@ -2,7 +2,8 @@
 
 Two halves:
   - parse_stream(text)   PURE  — turn a `claude -p --output-format stream-json`
-                                 transcript into (triggered, tools_fired, final_text, ok).
+                                 transcript into
+                                 (triggered, tools_fired, final_text, ok, tool_calls).
   - run_prompt(prompt)   IMPURE — shell out to `claude -p` and feed its stream to
                                  parse_stream.
 

@@ -87,7 +87,14 @@ EXPECTED_ARGS = {
     "explicit-lookup-pin-en":        {"resolve_source": {"library": "react", "version": "18"}},
     "explicit-lookup-cran-zh":       {"resolve_source": {"library": "dplyr", "ecosystem": "cran"}},
     "explicit-lookup-scoped-pin-en": {"resolve_source": {"library": "@types/node", "version": "20"}},
-    "explicit-lookup-crates-pin-en": {"resolve_source": {"library": "serde", "ecosystem": "crates", "version": "1.0.100"}},
+    # crates: ecosystem is the load-bearing catcher; version deliberately NOT
+    # asserted (a non-npm/pypi pin may be legitimately omitted — over-assert guard).
+    "explicit-lookup-crates-pin-en": {"resolve_source": {"library": "serde", "ecosystem": "crates"}},
+    # Language / URL shapes are arg-sensitive too: a wrong introspect kind fires
+    # the same tool. Pin the stable kind (not the version-fragile js target).
+    "explicit-lookup-r-en":          {"introspect": {"kind": "runtime"}},
+    "explicit-lookup-js-alias-en":   {"introspect": {"kind": "runtime"}},
+    "explicit-lookup-openapi-url-en": {"introspect": {"kind": "openapi"}},
 }
 
 
