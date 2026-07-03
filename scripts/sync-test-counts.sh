@@ -31,11 +31,17 @@ if [ $? -ne 0 ]; then
   echo "✗ swift test FAILED — refusing to stamp 'all green'." >&2
   printf '%s\n' "$SWIFT_OUT" | tail -20 >&2; exit 1
 fi
-# Grand total = the 'Executed N tests, with 0 failures' line for the top-level
-# 'All tests' suite; it is the largest such N (sum over all bundles).
+# Grand total: prefer the single "Test Suite 'All tests'" Executed line (macOS
+# links one bundle); fall back to summing the per-bundle '.xctest' Executed lines
+# (Linux / multi-bundle CI emits one grand line per bundle, no combined line).
 SWIFT=$(printf '%s\n' "$SWIFT_OUT" \
-  | grep -oE 'Executed [0-9]+ tests, with 0 failures' \
-  | grep -oE '[0-9]+' | sort -n | tail -1)
+  | grep -A1 "Test Suite 'All tests' passed" \
+  | grep -oE 'Executed [0-9]+' | grep -oE '[0-9]+' | tail -1)
+if [ -z "$SWIFT" ]; then
+  SWIFT=$(printf '%s\n' "$SWIFT_OUT" \
+    | grep -A1 "xctest' passed" \
+    | grep -oE 'Executed [0-9]+' | grep -oE '[0-9]+' | awk '{s+=$1} END{print s}')
+fi
 
 echo "Running pytest…"
 PY_OUT=$(python3 -m pytest evals/look-up/tests/ -q 2>&1)
@@ -47,7 +53,7 @@ fi
 # passed + skipped + xfailed + xpassed — so a skip doesn't undercount vs the rows.
 PYTHON=$(printf '%s\n' "$PY_OUT" \
   | grep -oE '[0-9]+ (passed|skipped|xfailed|xpassed)' \
-  | grep -oE '^[0-9]+' | paste -sd+ - | bc)
+  | grep -oE '^[0-9]+' | awk '{s+=$1} END{print s}')
 
 if ! [ "${SWIFT:-0}" -gt 0 ] 2>/dev/null || ! [ "${PYTHON:-0}" -gt 0 ] 2>/dev/null; then
   echo "✗ could not parse counts (Swift='${SWIFT:-}' Python='${PYTHON:-}') — output format changed?" >&2
@@ -74,9 +80,11 @@ def check_consistency(path):
     subtotals = {"swift": [], "python": []}
     row_only = {"swift": 0, "python": 0}      # rows not under a ### (Python side)
     in_fence = False
-    h2    = re.compile(r"^##\s+(.+)")                       # ANY "## …" heading
-    suite = re.compile(r"^(Swift|Python)\s+—\s+\d+", re.I)  # a suite total heading
-    h3    = re.compile(r"^###\s+`?([\w.\-]+)`?\s+—\s+(\d+)\b")
+    # Accept em-dash/en-dash/hyphen as the "— N" separator so a typo'd dash can't
+    # silently skip a subtotal (which would drop its check, a false-negative).
+    h2    = re.compile(r"^##\s+(.+)")                          # ANY "## …" heading
+    suite = re.compile(r"^(Swift|Python)\s+[—–-]\s+\d+", re.I) # a suite total heading
+    h3    = re.compile(r"^###\s+`?([\w.\-]+)`?\s+[—–-]\s+(\d+)\b")
     h3any = re.compile(r"^###\s")
     row   = re.compile(r"^\|\s*`([\w.\-]+)`\s*\|\s*(\d+)\s*\|")
     def flush():
