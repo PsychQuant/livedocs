@@ -137,11 +137,16 @@ when reading the fetched docs:
    (b) means a bare `npm:` / `cran:` is **not** a hint; a non-ecosystem prefix
    (`foo:bar`, `C:\path`) is **not** a hint. In every not-a-hint case pass the
    **whole** token (colon included) through to Language then Package. When it IS a
-   hint, lowercase the prefix as the named ecosystem and classify the remainder as
-   a **Package** (rule 4) — the remainder is the package identifier **verbatim**,
-   never re-checked as a URL/hint/Language/CLI, so a remainder that itself has
-   colons (a Maven coordinate `maven:com.google.guava:guava`) stays intact, and a
-   `name@version` pin on the remainder is applied per rule 4. This is the explicit
+   hint, lowercase the prefix as the named ecosystem and resolve the remainder as
+   a **Package** in that ecosystem, applying rule 4's `name@version` parsing to the
+   remainder **only**. The remainder is otherwise the package identifier
+   **verbatim**, never re-checked as a URL/hint/Language, and the **rule-4 CLI
+   fallback does NOT apply** — a hint committed to a package ecosystem, so
+   `npm:make` resolves the npm package `make`, never the CLI. A remainder with
+   colons (a Maven coordinate `maven:com.google.guava:guava`) stays intact; the
+   only pin form on a hinted remainder is `@version` (`maven:g:a@1.0`), so a native
+   `maven:group:artifact:version` colon-version is part of the coordinate, not a
+   pin. This is the explicit
    **escape hatch**: it *overrides* Language-set shadowing (`npm:go` → the npm
    package `go`, **not** the Go runtime) and names the ecosystem for named-only
    registries (`cran:dplyr`). The hint selects a package ecosystem only; it never
