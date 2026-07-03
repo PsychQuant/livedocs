@@ -161,16 +161,32 @@ public struct DiscoveryEngine: Sendable {
         if let v = version, !isSafeVersion(v) { return nil }
 
         let order = ecosystem.map { [$0] } ?? Ecosystem.autoOrder
-        let isAutoDetect = ecosystem == nil
-        for (idx, eco) in order.enumerated() {
-            // Auto-detect ([.npm, .pypi]): a pinned-version MISS on an earlier
-            // ecosystem must NOT short-circuit to that ecosystem's latest — the
-            // next ecosystem might have the exact pin. Only the last ecosystem in
-            // the chain (or any explicit ecosystem) falls back to latest+false, so
-            // we never return a wrong-package latest while a real pin exists on the
-            // next registry (issue #36 round-3).
-            let allowFallback = !isAutoDetect || idx == order.count - 1
-            if var res = await fetchRegistry(eco: eco, library: library, version: version, fallbackToLatest: allowFallback) {
+
+        // Auto-detect ([.npm, .pypi]) + a pin: two passes. Pass 1 tries EVERY
+        // ecosystem for the pinned URL (no latest fallback) so a pin present only
+        // on the 2nd registry isn't pre-empted by the 1st's latest. Pass 2 runs
+        // only if no registry had anything at the pinned URL — then fall back to
+        // the first ecosystem that has the package at all, with pinHonored=false
+        // (a pin was requested but not found anywhere). This fixes the wrong-package
+        // short-circuit WITHOUT losing the helpful latest fallback (issue #36 r3).
+        if ecosystem == nil, let v = version {
+            for eco in order {
+                if let res = await fetchRegistry(eco: eco, library: library, version: v, fallbackToLatest: false) {
+                    return res
+                }
+            }
+            for eco in order {
+                if var res = await fetchRegistry(eco: eco, library: library, version: nil, fallbackToLatest: true) {
+                    res.pinHonored = false
+                    return res
+                }
+            }
+            return nil
+        }
+
+        // Explicit ecosystem, or no pin: single pass with latest fallback allowed.
+        for eco in order {
+            if var res = await fetchRegistry(eco: eco, library: library, version: version, fallbackToLatest: true) {
                 // Latest-only ecosystems: a requested pin could not be honored.
                 // Say so explicitly instead of leaving the signal absent (issue #36).
                 if version != nil, !eco.supportsVersionPin { res.pinHonored = false }

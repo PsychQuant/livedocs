@@ -185,4 +185,18 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(res?.pinHonored, true)
         XCTAssertEqual(res?.repository, "https://github.com/py/foo")
     }
+
+    func testAutoDetectPinMissAnywhereStillReturnsNpmLatest() async {
+        // Pin exists on NEITHER registry, but npm has the package. Pass 1 (exact
+        // pin) misses everywhere; pass 2 must still return npm's latest+false so we
+        // don't lose the helpful current-version answer (round-3 two-pass).
+        let http = FakeHTTP(routes: [
+            "https://registry.npmjs.org/leftpad/latest":
+                HTTPResponse(status: 200, contentType: "application/json", body: Data(#"{"version":"1.3.0"}"#.utf8)),
+            // no /leftpad/9.9.9, no PyPI leftpad at all
+        ])
+        let res = await DiscoveryEngine(http: http).latestVersion(library: "leftpad", ecosystem: nil, version: "9.9.9")
+        XCTAssertEqual(res?.version, "1.3.0", "must fall back to npm latest, not return not-found")
+        XCTAssertEqual(res?.pinHonored, false)
+    }
 }

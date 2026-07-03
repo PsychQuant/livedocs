@@ -2,23 +2,23 @@
 
 # Testing
 
-LiveDocs has two independent test suites — **184 tests, all green**. The Swift suite verifies
+LiveDocs has two independent test suites — **185 tests, all green**. The Swift suite verifies
 the engine; the Python suite verifies that the `look-up` *skill* actually triggers a
 LiveDocs query and answers currently, plus the vs-context7 comparison harness. Counts below
 are a snapshot; the source of truth is running the suites.
 
 ```bash
-swift test                                  # 143 Swift tests
+swift test                                  # 144 Swift tests
 python3 -m pytest evals/look-up/tests/  # 41 Python eval tests
 ```
 
-## Swift — 143 tests (`swift test`)
+## Swift — 144 tests (`swift test`)
 
 Split along the pure-core / MCP-shell architecture. `LiveDocsCore` is dependency-free and
 tested without a network (HTTP is injected as a fake); `CheLiveDocsMCP` covers the process
 and file-system layer.
 
-### `LiveDocsCoreTests` — 114 (pure logic)
+### `LiveDocsCoreTests` — 115 (pure logic)
 
 | File | Tests | Covers |
 |------|------:|--------|
@@ -29,7 +29,7 @@ and file-system layer.
 | `LLMSTxtTests` | 6 | `llms.txt` candidate ordering, soft-404 content-type guard, index/full flavor split. |
 | `IntrospectionTests` | 6 | OpenAPI / GraphQL schema parsing (method allowlist, shape-only, deterministic ordering). |
 | `RIntrospectionTests` | 6 | Installed-R-package version parsing + safe-name validation. |
-| `EngineTests` | 11 | Discovery chain over injected HTTP fakes (registry → llms.txt → repo), non-npm/pypi version-pin honoring (`pin_honored` true/false/nil), the latest-only-ecosystem engine path setting `pin_honored=false`, and auto-detect falling through npm→PyPI on an npm pinned-version miss. |
+| `EngineTests` | 12 | Discovery chain over injected HTTP fakes (registry → llms.txt → repo), non-npm/pypi version-pin honoring (`pin_honored` true/false/nil), the latest-only-ecosystem engine path setting `pin_honored=false`, and auto-detect's two-pass pin resolution (fall through npm→PyPI for an exact pin, then fall back to npm latest+false when the pin exists nowhere). |
 | `ETagCacheTests` | 5 | ETag revalidation semantics (304 → cached, 200 → refresh, never blind-stale, POST never cached). |
 | `RegistryTests` | 5 | Per-ecosystem registry resolution + version pinning. |
 | `ClassificationTests` | 4 | Soft-404 hit/miss classification. |

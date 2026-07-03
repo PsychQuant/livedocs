@@ -113,7 +113,7 @@ python3 evals/look-up/compare_context7.py --verify-live  # warn if the snapshot 
 
 See [`evals/look-up/README.md`](evals/look-up/README.md) for the design of both, and
 the [Testing wiki page](https://github.com/PsychQuant/livedocs/wiki/Testing) for the full
-suite breakdown (184 tests: 143 Swift + 41 Python).
+suite breakdown (185 tests: 144 Swift + 41 Python).
 
 Status: shipped (v0.8.0; engine features below shipped v0.7.0, the skill's `look-up` rename +
 explicit invocation landed in v0.8.0). 9-ecosystem registry resolution, version pinning (npm/pypi/crates/go/rubygems), OpenAPI/GraphQL/CLI +
