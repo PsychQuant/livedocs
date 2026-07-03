@@ -221,4 +221,43 @@ final class RuntimeIntrospectionTests: XCTestCase {
     func testIdiomaticSkipsCommentLines() {
         XCTAssertEqual(parseIdiomaticVersionFile("# a comment\n\n3.2.2"), "3.2.2")
     }
+
+    // MARK: - R depth adapter (issue #35)
+
+    func testParseToolchainVersionParsesROutputs() {
+        XCTAssertEqual(parseToolchainVersion("R version 4.4.1 (2024-06-14) -- \"Race for Your Life\"", language: .r), "4.4.1")
+        XCTAssertEqual(parseToolchainVersion("Rscript (R) version 4.4.1 (2024-06-14)", language: .r), "4.4.1")
+    }
+
+    func testParseRDescription() {
+        let desc = """
+        Package: mypkg
+        Title: A Package
+        Depends: R (>= 4.1.0),
+            methods
+        Imports: rlang
+        """
+        XCTAssertEqual(parseRDescription(desc), "4.1.0")
+        XCTAssertEqual(parseRDescription("Depends: R (>= 3.5)"), "3.5")
+        XCTAssertNil(parseRDescription("Package: nodeps\nImports: rlang"))
+        XCTAssertNil(parseRDescription("Depends: methods, utils"))   // no R entry
+    }
+
+    func testDetectLanguagesFindsR() {
+        XCTAssertTrue(detectLanguages(files: ["DESCRIPTION"]).contains(.r))
+        XCTAssertTrue(detectLanguages(files: ["renv.lock"]).contains(.r))
+        XCTAssertTrue(detectLanguages(files: [".r-version"]).contains(.r))
+        XCTAssertTrue(detectLanguages(files: ["analysis.Rproj"]).contains(.r))
+        XCTAssertFalse(detectLanguages(files: ["package.json"]).contains(.r))
+    }
+
+    // MARK: - javascript -> node alias (issue #35)
+
+    func testCanonicalRuntimeTargetAliasesJavascriptToNode() {
+        XCTAssertEqual(canonicalRuntimeTarget("javascript"), "node")
+        XCTAssertEqual(canonicalRuntimeTarget("JavaScript"), "node")
+        XCTAssertEqual(canonicalRuntimeTarget("node"), "node")
+        XCTAssertEqual(canonicalRuntimeTarget("r"), "r")
+        XCTAssertEqual(canonicalRuntimeTarget("Python"), "python")
+    }
 }

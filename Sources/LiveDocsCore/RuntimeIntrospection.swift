@@ -40,7 +40,15 @@ public enum RuntimeResolution: Equatable, Sendable {
 /// Languages outside this set still get declared-version coverage via the
 /// universal pin layer.
 public enum RuntimeLanguage: String, CaseIterable, Sendable {
-    case python, node, go, rust, java, dotnet, swift
+    case python, node, go, rust, java, dotnet, swift, r
+}
+
+/// Canonicalize a runtime target id before enum lookup. `javascript` is an
+/// alias of `node` — the caller-facing languageId keeps the requested form;
+/// only adapter selection goes through the canonical id (issue #35).
+public func canonicalRuntimeTarget(_ id: String) -> String {
+    let lower = id.lowercased()
+    return lower == "javascript" ? "node" : lower
 }
 
 // MARK: - Precedence engine
@@ -208,7 +216,49 @@ public func detectLanguages(files: Set<String>) -> [RuntimeLanguage] {
     if any(["pom.xml", ".java-version", "build.gradle", "build.gradle.kts"]) { out.append(.java) }
     if any(["global.json"]) || anySuffix([".csproj", ".fsproj", ".sln"]) { out.append(.dotnet) }
     if any(["Package.swift", ".swift-version"]) { out.append(.swift) }
+    if any(["DESCRIPTION", "renv.lock", ".r-version"]) || anySuffix([".Rproj"]) { out.append(.r) }
     return out
+}
+
+// MARK: - R DESCRIPTION parsing
+
+/// Extract the minimum R version from a DESCRIPTION file's `Depends` field —
+/// `Depends: R (>= 4.1.0), methods` → "4.1.0". DESCRIPTION is DCF: a field's
+/// value continues on following lines that start with whitespace. Only the `R`
+/// entry of `Depends` is version-relevant; other entries and all other fields
+/// are ignored. The value is a **constraint** (lower bound), never an exact
+/// effective version — callers must pass `.constraint` semantics.
+public func parseRDescription(_ content: String) -> String? {
+    var dependsValue: String?
+    var collecting = false
+    for line in content.split(separator: "\n", omittingEmptySubsequences: false) {
+        if collecting {
+            if line.first == " " || line.first == "\t" {
+                dependsValue! += " " + line.trimmingCharacters(in: .whitespaces)
+                continue
+            }
+            collecting = false
+        }
+        if line.lowercased().hasPrefix("depends:") {
+            dependsValue = String(line.dropFirst("depends:".count)).trimmingCharacters(in: .whitespaces)
+            collecting = true
+        }
+    }
+    guard let value = dependsValue else { return nil }
+    // The R entry is comma-separated from package deps (`methods`, ...);
+    // accept `R (>= x.y[.z])` and tolerate a bare `>`.
+    for entry in value.split(separator: ",") {
+        let e = entry.trimmingCharacters(in: .whitespaces)
+        guard e == "R" || e.hasPrefix("R ") || e.hasPrefix("R(") else { continue }
+        if let open = e.firstIndex(of: "("), let close = e.firstIndex(of: ")"), open < close {
+            let inner = e[e.index(after: open)..<close]
+                .replacingOccurrences(of: ">=", with: " ")
+                .replacingOccurrences(of: ">", with: " ")
+                .trimmingCharacters(in: .whitespaces)
+            if !inner.isEmpty, inner.first!.isNumber { return inner }
+        }
+    }
+    return nil
 }
 
 // MARK: - Boundary validation

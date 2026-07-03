@@ -61,6 +61,10 @@ enum RuntimeIntrospect {
             return Adapter(idiomaticFile: ".swift-version", manifestFile: "Package.swift",
                            manifestParse: parseSwiftToolsVersion, manifestSemantics: .languageMode,
                            probeCommands: ["swift"], probeArg: "--version")
+        case .r:
+            return Adapter(idiomaticFile: ".r-version", manifestFile: "DESCRIPTION",
+                           manifestParse: parseRDescription, manifestSemantics: .constraint,
+                           probeCommands: ["R", "Rscript"], probeArg: "--version")
         }
     }
 
@@ -71,7 +75,10 @@ enum RuntimeIntrospect {
     static func resolve(cwd: String, languageId: String?) -> [LanguageResult] {
         if let id = languageId {
             guard isSafeLanguageId(id) else { return [] }
-            if let l = RuntimeLanguage(rawValue: id) {
+            // `javascript` is an alias of `node` (issue #35): adapter selection
+            // uses the canonical id, the result keeps the requested id, and the
+            // resolution source discloses the node probe that actually ran.
+            if let l = RuntimeLanguage(rawValue: canonicalRuntimeTarget(id)) {
                 return [LanguageResult(languageId: id, resolution: resolveOne(l, cwd: cwd))]
             }
             // Uncovered but safe language (e.g. ruby, elixir): universal pin layer only.
@@ -135,6 +142,7 @@ enum RuntimeIntrospect {
         case .java:   return ["java"]
         case .dotnet: return ["dotnet"]
         case .swift:  return ["swift"]
+        case .r:      return ["r"]
         }
     }
 
