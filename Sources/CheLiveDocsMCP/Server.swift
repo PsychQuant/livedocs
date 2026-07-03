@@ -187,7 +187,7 @@ final class CheLiveDocsMCPServer {
         case "r-pkg":
             return encodeRInstalled(package: target)
         case "runtime":
-            let langId = (target == "auto" || target.isEmpty) ? nil : target
+            let langId = (target.lowercased() == "auto" || target.isEmpty) ? nil : target
             let cwd = try runtimeCwd(path)
             return encodeRuntime(RuntimeIntrospect.resolve(cwd: cwd, languageId: langId), cwd: cwd)
         case "openapi":

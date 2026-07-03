@@ -51,6 +51,16 @@ public func canonicalRuntimeTarget(_ id: String) -> String {
     return lower == "javascript" ? "node" : lower
 }
 
+/// Canonicalize + validate in one step: lowercase, map aliases, then apply the
+/// safety gate. Returns nil for rejected ids. Callers MUST canonicalize BEFORE
+/// gating — `isSafeLanguageId`'s charset is lowercase-only, so gating the raw
+/// id would reject "R" and "JavaScript", breaking the explicit-doc-lookup
+/// spec's case-insensitive matching contract (PR #40 verify HIGH).
+public func normalizedRuntimeTarget(_ id: String) -> String? {
+    let canonical = canonicalRuntimeTarget(id)
+    return isSafeLanguageId(canonical) ? canonical : nil
+}
+
 // MARK: - Precedence engine
 
 /// Resolve the effective runtime version from a set of candidates. The **active
@@ -216,7 +226,13 @@ public func detectLanguages(files: Set<String>) -> [RuntimeLanguage] {
     if any(["pom.xml", ".java-version", "build.gradle", "build.gradle.kts"]) { out.append(.java) }
     if any(["global.json"]) || anySuffix([".csproj", ".fsproj", ".sln"]) { out.append(.dotnet) }
     if any(["Package.swift", ".swift-version"]) { out.append(.swift) }
-    if any(["DESCRIPTION", "renv.lock", ".r-version"]) || anySuffix([".Rproj"]) { out.append(.r) }
+    // R: a bare DESCRIPTION is too weak a signal (generic description files
+    // exist outside R) — require the NAMESPACE companion that every R package
+    // ships. renv.lock / .r-version / *.Rproj each suffice alone. renv.lock is
+    // a detection signal only; parsing its pinned R version is a tracked
+    // follow-up, not silently claimed here.
+    if (files.contains("DESCRIPTION") && files.contains("NAMESPACE"))
+        || any(["renv.lock", ".r-version"]) || anySuffix([".Rproj", ".rproj"]) { out.append(.r) }
     return out
 }
 
@@ -229,33 +245,41 @@ public func detectLanguages(files: Set<String>) -> [RuntimeLanguage] {
 /// are ignored. The value is a **constraint** (lower bound), never an exact
 /// effective version — callers must pass `.constraint` semantics.
 public func parseRDescription(_ content: String) -> String? {
-    var dependsValue: String?
+    // Collect ALL Depends fields (a malformed DESCRIPTION may repeat the
+    // field) — the first field carrying an R entry wins, so a later
+    // `Depends: methods` cannot clobber an earlier R constraint.
+    var dependsValues: [String] = []
     var collecting = false
-    for line in content.split(separator: "\n", omittingEmptySubsequences: false) {
+    for rawLine in content.split(separator: "\n", omittingEmptySubsequences: false) {
+        let line = String(rawLine).trimmingCharacters(in: .newlines)   // CRLF tolerance
         if collecting {
             if line.first == " " || line.first == "\t" {
-                dependsValue! += " " + line.trimmingCharacters(in: .whitespaces)
+                dependsValues[dependsValues.count - 1] += " " + line.trimmingCharacters(in: .whitespacesAndNewlines)
                 continue
             }
             collecting = false
         }
         if line.lowercased().hasPrefix("depends:") {
-            dependsValue = String(line.dropFirst("depends:".count)).trimmingCharacters(in: .whitespaces)
+            dependsValues.append(String(line.dropFirst("depends:".count)).trimmingCharacters(in: .whitespacesAndNewlines))
             collecting = true
         }
     }
-    guard let value = dependsValue else { return nil }
-    // The R entry is comma-separated from package deps (`methods`, ...);
-    // accept `R (>= x.y[.z])` and tolerate a bare `>`.
-    for entry in value.split(separator: ",") {
-        let e = entry.trimmingCharacters(in: .whitespaces)
-        guard e == "R" || e.hasPrefix("R ") || e.hasPrefix("R(") else { continue }
-        if let open = e.firstIndex(of: "("), let close = e.firstIndex(of: ")"), open < close {
-            let inner = e[e.index(after: open)..<close]
-                .replacingOccurrences(of: ">=", with: " ")
-                .replacingOccurrences(of: ">", with: " ")
-                .trimmingCharacters(in: .whitespaces)
-            if !inner.isEmpty, inner.first!.isNumber { return inner }
+    for value in dependsValues {
+        for entry in value.split(separator: ",") {
+            let e = entry.trimmingCharacters(in: .whitespacesAndNewlines)
+                .replacingOccurrences(of: "\t", with: " ")
+            guard e == "R" || e.hasPrefix("R ") || e.hasPrefix("R(") else { continue }
+            guard let open = e.firstIndex(of: "("), let close = e.firstIndex(of: ")"), open < close else { continue }
+            var inner = String(e[e.index(after: open)..<close]).trimmingCharacters(in: .whitespacesAndNewlines)
+            // Only `>=` maps onto our lower-bound constraint semantics. A bare
+            // exclusive `>` (or ==, <=) is a DIFFERENT contract — skip it
+            // rather than silently weakening it to >= (PR #40 verify finding).
+            guard inner.hasPrefix(">=") else { continue }
+            inner = String(inner.dropFirst(2)).trimmingCharacters(in: .whitespacesAndNewlines)
+            // Take only the leading version-shaped token; trailing prose like
+            // "4.1.0 patched" must not leak into the version string.
+            let version = String(inner.prefix(while: { $0.isNumber || $0 == "." }))
+            if let first = version.first, first.isNumber { return version }
         }
     }
     return nil

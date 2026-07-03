@@ -164,8 +164,9 @@ classifier on every outbound fetch; CLI command-name shape validation, a
 adds routing, not a bypass of those checks.
 
 Shape examples: `/livedocs:look-up R` → runtime introspect via the R depth
-adapter (probes R/Rscript, DESCRIPTION `Depends` cross-checks as a constraint),
-R docs anchored to the local R version ·
+adapter — anchored to the local R toolchain version when R/Rscript is installed;
+DESCRIPTION `Depends` is only a lower-bound cross-check (never the effective
+version), and with no toolchain the honest not-resolved degrade applies ·
 `/livedocs:look-up javascript` → engine alias to the `node` adapter, anchored to
 the local Node version · `/livedocs:look-up react@18` → registry docs pinned to 18 ·
 `/livedocs:look-up serde@1.0.100` → you name `ecosystem:"crates"`; registry

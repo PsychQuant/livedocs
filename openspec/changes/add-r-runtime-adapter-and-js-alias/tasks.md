@@ -16,5 +16,5 @@
 
 ## 4. 全量驗證
 
-- [ ] 4.1 swift test 全綠（110 + 新增 R/alias 測試）；grep 驗證 spec deltas 與 SKILL/Server 描述一致（8 語言清單三處同步：兩 spec + Server 描述）。
+- [x] 4.1 swift test 全綠（110 + 新增 R/alias 測試）；grep 驗證 spec deltas 與 SKILL/Server 描述一致（8 語言清單三處同步：兩 spec + Server 描述）。
 - [ ] 4.2 發布鏈（post-merge step，非 merge blocker）：與 #36 共用一次 make release-signed + binary_version bump + marketplace 同步；本 change merge 時不執行。驗證：PR merge 後由 release train issue/checklist 追蹤。

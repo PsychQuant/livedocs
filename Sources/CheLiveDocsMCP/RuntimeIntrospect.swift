@@ -74,15 +74,16 @@ enum RuntimeIntrospect {
     /// With no id, auto-detect every depth-adapter language present in `cwd`.
     static func resolve(cwd: String, languageId: String?) -> [LanguageResult] {
         if let id = languageId {
-            guard isSafeLanguageId(id) else { return [] }
-            // `javascript` is an alias of `node` (issue #35): adapter selection
-            // uses the canonical id, the result keeps the requested id, and the
-            // resolution source discloses the node probe that actually ran.
-            if let l = RuntimeLanguage(rawValue: canonicalRuntimeTarget(id)) {
+            // Canonicalize BEFORE the safety gate — the gate's charset is
+            // lowercase-only, so gating the raw id would reject "R" and
+            // "JavaScript" (PR #40 verify HIGH). The result keeps the requested
+            // id; the resolution source discloses the probe that actually ran.
+            guard let canonical = normalizedRuntimeTarget(id) else { return [] }
+            if let l = RuntimeLanguage(rawValue: canonical) {
                 return [LanguageResult(languageId: id, resolution: resolveOne(l, cwd: cwd))]
             }
             // Uncovered but safe language (e.g. ruby, elixir): universal pin layer only.
-            return [LanguageResult(languageId: id, resolution: resolveGeneric(id, cwd: cwd))]
+            return [LanguageResult(languageId: id, resolution: resolveGeneric(canonical, cwd: cwd))]
         }
         return detectLanguages(files: directoryEntries(cwd))
             .map { LanguageResult(languageId: $0.rawValue, resolution: resolveOne($0, cwd: cwd)) }

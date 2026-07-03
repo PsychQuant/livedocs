@@ -2,17 +2,17 @@
 
 # Testing
 
-LiveDocs has two independent test suites — **151 tests, all green**. The Swift suite verifies
+LiveDocs has two independent test suites — **160 tests, all green**. The Swift suite verifies
 the engine; the Python suite verifies that the `look-up` *skill* actually triggers a
 LiveDocs query and answers currently, plus the vs-context7 comparison harness. Counts below
 are a snapshot; the source of truth is running the suites.
 
 ```bash
-swift test                                  # 110 Swift tests
+swift test                                  # 119 Swift tests
 python3 -m pytest evals/look-up/tests/  # 41 Python eval tests
 ```
 
-## Swift — 110 tests (`swift test`)
+## Swift — 119 tests (`swift test`)
 
 Split along the pure-core / MCP-shell architecture. `LiveDocsCore` is dependency-free and
 tested without a network (HTTP is injected as a fake); `CheLiveDocsMCP` covers the process
@@ -22,7 +22,7 @@ and file-system layer.
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `RuntimeIntrospectionTests` | 25 | Language-runtime detection: pin parsers (`.tool-versions`, mise, idiomatic `.<lang>-version`), the precedence engine (active toolchain authoritative), mise inline-comment / array rejection, multi-line / alias rejection. |
+| `RuntimeIntrospectionTests` | 30 | Language-runtime detection: pin parsers (`.tool-versions`, mise, idiomatic `.<lang>-version`), the precedence engine (active toolchain authoritative), mise inline-comment / array rejection, multi-line / alias rejection, R toolchain-banner parsing + DESCRIPTION `Depends` constraint, javascript→node canonicalization before the safety gate. |
 | `RegistryAdaptersTests` | 11 | Parsers for all 9 registries (npm / PyPI / crates / go / rubygems / JSR / packagist / maven / CRAN). |
 | `URLSafetyTests` | 9 | SSRF guard: scheme allowlist + loopback / link-local (`169.254`) / RFC-1918 / ULA / metadata host classification. |
 | `TextSanitizeTests` | 7 | Control / ANSI / OSC / bidi / zero-width stripping of fetched content + UTF-8 byte truncation. |
@@ -41,7 +41,7 @@ and file-system layer.
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `RuntimeIntrospectTests` | 7 | Symlink version-file refusal (secret-exfil guard), uncovered-language fallback to the universal pin layer, canonical `mise.toml`, PATH-first executable resolution. |
+| `RuntimeIntrospectTests` | 11 | Symlink version-file refusal (secret-exfil guard), uncovered-language fallback to the universal pin layer, canonical `mise.toml`, PATH-first executable resolution, uppercase-id acceptance with requested-id preservation (R / JavaScript), javascript↔node resolution equivalence. |
 | `ProcessRunnerTests` | 4 | Large output doesn't deadlock (concurrent pipe drain), exit code surfaces, timeout reported, SIGTERM→SIGKILL escalation. |
 
 ## Python — 41 tests (`pytest evals/look-up/`)
@@ -71,5 +71,5 @@ vs-context7 comparison harness. See
 
 Security- and robustness-critical surfaces were built test-first (TDD): `URLSafety`,
 `TextSanitize`, `ProcessRunner`, and the eval harness each had a failing test before the
-implementation. The suite grew 72 → 110 Swift tests during the v0.7.0 hardening (adding the
+implementation. The suite grew 72 → 119 Swift tests through the v0.7.0 hardening and the R-adapter work (adding the
 previously-untested MCP shell layer), and 0 → 41 for the Python evals (skill eval + vs-context7).
