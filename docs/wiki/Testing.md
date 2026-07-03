@@ -2,14 +2,14 @@
 
 # Testing
 
-LiveDocs has two independent test suites — **154 tests, all green**. The Swift suite verifies
+LiveDocs has two independent test suites — **160 tests, all green**. The Swift suite verifies
 the engine; the Python suite verifies that the `look-up` *skill* actually triggers a
 LiveDocs query and answers currently, plus the vs-context7 comparison harness. Counts below
 are a snapshot; the source of truth is running the suites.
 
 ```bash
 swift test                                  # 110 Swift tests
-python3 -m pytest evals/look-up/tests/  # 44 Python eval tests
+python3 -m pytest evals/look-up/tests/  # 50 Python eval tests
 ```
 
 ## Swift — 110 tests (`swift test`)
@@ -44,7 +44,7 @@ and file-system layer.
 | `RuntimeIntrospectTests` | 7 | Symlink version-file refusal (secret-exfil guard), uncovered-language fallback to the universal pin layer, canonical `mise.toml`, PATH-first executable resolution. |
 | `ProcessRunnerTests` | 4 | Large output doesn't deadlock (concurrent pipe drain), exit code surfaces, timeout reported, SIGTERM→SIGKILL escalation. |
 
-## Python — 44 tests (`pytest evals/look-up/`)
+## Python — 50 tests (`pytest evals/look-up/`)
 
 The `look-up` **skill eval harness** — not a test of the Swift engine, but of whether
 the skill fires a LiveDocs query for varied prompts and answers currently — plus the
@@ -53,11 +53,11 @@ vs-context7 comparison harness. See
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `test_run_eval.py` | 14 | Rate-threshold judging, the N=3 threshold-collapse guard, failed-run / inconclusive handling, explicit-invocation route matching. |
+| `test_run_eval.py` | 17 | Rate-threshold judging, the N=3 threshold-collapse guard, failed-run / inconclusive handling, explicit-invocation route matching, and `args_match` — the right tool with the wrong args (a mis-split `name@version` / dropped ecosystem pin) scores incorrect. |
 | `test_compare.py` | 12 | vs-context7 freshness harness: version-token matching (boundary forms), symmetric scoring, table render, corpus↔sample sync. |
 | `test_oracle.py` | 8 | `self_check` (fetch registry at eval time — rot-proof) / `structural` / `golden` oracles. |
-| `test_detect.py` | 7 | `claude -p` stream-json parsing, `is_error` detection, LiveDocs trigger-signal recognition. |
-| `test_corpus.py` | 3 | Corpus coverage guards (a golden case exists + a library-named adversarial negative exists + the explicit /livedocs:look-up shape set stays id-exact: language degrade, simple/scoped/non-npm-pypi pins, cran+zh, two URL forms, js alias, same-name shadowing, bare no-arg). |
+| `test_detect.py` | 9 | `claude -p` stream-json parsing, `is_error` detection, LiveDocs trigger-signal recognition, and per-call tool-input capture (short name + input args). |
+| `test_corpus.py` | 4 | Corpus coverage guards (a golden case exists + a library-named adversarial negative exists + the explicit /livedocs:look-up shape set stays id-exact + the arg-sensitive cases pin their `expected_args`: language degrade, simple/scoped/non-npm-pypi pins, cran+zh, two URL forms, js alias, same-name shadowing, bare no-arg). |
 
 ## CI and the release gate
 
@@ -72,4 +72,4 @@ vs-context7 comparison harness. See
 Security- and robustness-critical surfaces were built test-first (TDD): `URLSafety`,
 `TextSanitize`, `ProcessRunner`, and the eval harness each had a failing test before the
 implementation. The suite grew 72 → 110 Swift tests during the v0.7.0 hardening (adding the
-previously-untested MCP shell layer), and 0 → 44 for the Python evals (skill eval + vs-context7).
+previously-untested MCP shell layer), and 0 → 50 for the Python evals (skill eval + vs-context7).

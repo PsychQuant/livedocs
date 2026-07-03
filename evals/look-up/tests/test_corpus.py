@@ -78,3 +78,27 @@ def test_corpus_has_a_library_named_negative():
         and any(lib in c["prompt"].lower() for lib in KNOWN_LIBS)
     ]
     assert named, "corpus must include a negative that names a real library yet should not fetch"
+
+
+# expected_args coverage (issue #38 verify): the arg-sensitive shapes — where the
+# right tool firing is not enough — must pin the actual resolve_source inputs so a
+# mis-split name@version or a dropped ecosystem pin is caught, not silently passed.
+EXPECTED_ARGS = {
+    "explicit-lookup-pin-en":        {"resolve_source": {"library": "react", "version": "18"}},
+    "explicit-lookup-cran-zh":       {"resolve_source": {"library": "dplyr", "ecosystem": "cran"}},
+    "explicit-lookup-scoped-pin-en": {"resolve_source": {"library": "@types/node", "version": "20"}},
+    "explicit-lookup-crates-pin-en": {"resolve_source": {"library": "serde", "ecosystem": "crates", "version": "1.0.100"}},
+}
+
+
+def test_corpus_arg_sensitive_cases_pin_expected_args():
+    explicit = {c["id"]: c for c in CORPUS if c["category"] == "explicit"}
+    for cid, want in EXPECTED_ARGS.items():
+        c = explicit[cid]
+        got = c.get("expected_args")
+        assert got == want, f"{cid}: expected_args drifted — got {got}, want {want}"
+        # every tool named in expected_args must also be in expected_tools (so the
+        # route check and the arg check stay consistent).
+        for tool in got:
+            assert tool in (c.get("expected_tools") or []), \
+                f"{cid}: expected_args tool '{tool}' not in expected_tools"

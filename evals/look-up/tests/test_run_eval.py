@@ -8,7 +8,8 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from run_eval import judge_case, run_case, thresholds_reachable, DEFAULT_THRESHOLDS  # noqa: E402
+from run_eval import (judge_case, run_case, thresholds_reachable,  # noqa: E402
+                      DEFAULT_THRESHOLDS, args_match)
 
 TH = DEFAULT_THRESHOLDS  # trigger_min=0.8, false_trigger_max=0.2, correctness_min=0.8
 
@@ -74,7 +75,7 @@ def test_thresholds_non_degenerate_at_n5():
 # ── run_case failure / inconclusive handling (#2, #3, #4) ─────────────────────
 
 def _fake(triggered, ok, final="answer"):
-    return lambda prompt, cwd=None: (triggered, [], final, ok)
+    return lambda prompt, cwd=None: (triggered, [], final, ok, [])
 
 
 def test_all_runs_failed_is_inconclusive_not_pass():
@@ -90,7 +91,7 @@ def test_failed_runs_excluded_from_denominator():
     calls = {"n": 0}
     def run_fn(prompt, cwd=None):
         calls["n"] += 1
-        return (True, [], "x", calls["n"] != 2)  # 2nd run fails
+        return (True, [], "x", calls["n"] != 2, [])  # 2nd run fails
     r = run_case(_pos("none"), runs=3, cwd=None, run_fn=run_fn)
     assert r["failed_runs"] == 1
     assert r["trigger_rate"] == 1.0   # 2/2 valid, not 2/3
@@ -136,7 +137,48 @@ def test_run_case_explicit_route_mismatch_scores_incorrect():
             "expected_trigger": True, "expected_tools": ["introspect"],
             "oracle": {"type": "structural"}}
     def wrong_route(prompt, cwd=None):
-        return True, ["mcp__plugin_livedocs_livedocs__fetch_docs"], "an answer", True
+        return True, ["mcp__plugin_livedocs_livedocs__fetch_docs"], "an answer", True, []
     r = run_case(case, runs=2, cwd=None, run_fn=wrong_route)
     assert r["trigger_rate"] == 1.0
     assert r["correctness_rate"] == 0.0
+
+
+# ── args_match: right tool, wrong args (issue #38 verify) ─────────────────────
+
+def test_args_match_subset_and_string_normalized():
+    calls = [{"name": "resolve_source", "input": {"library": "react", "version": 18, "extra": "x"}}]
+    assert args_match({"resolve_source": {"library": "react", "version": "18"}}, calls) is True
+    assert args_match({}, calls) is True                       # empty = unconstrained
+    assert args_match({"resolve_source": {"library": "vue"}}, calls) is False   # wrong value
+    assert args_match({"introspect": {"target": "r"}}, calls) is False          # tool never called
+
+
+def test_args_match_catches_last_at_mis_split():
+    # @types/node@20 mis-split to library "@types" (version node@20) must fail.
+    good = [{"name": "resolve_source", "input": {"library": "@types/node", "version": "20"}}]
+    bad = [{"name": "resolve_source", "input": {"library": "@types", "version": "node@20"}}]
+    want = {"resolve_source": {"library": "@types/node", "version": "20"}}
+    assert args_match(want, good) is True
+    assert args_match(want, bad) is False
+
+
+def test_run_case_explicit_wrong_args_scores_incorrect():
+    # issue #38 verify: the RIGHT tool fires (resolve_source) but with a mis-split
+    # library — route passes, args do not → not correct.
+    case = {"id": "scoped", "category": "explicit",
+            "prompt": "/livedocs:look-up @types/node@20", "expected_trigger": True,
+            "expected_tools": ["resolve_source"],
+            "expected_args": {"resolve_source": {"library": "@types/node", "version": "20"}},
+            "oracle": {"type": "structural"}}
+    def mis_split(prompt, cwd=None):
+        return (True, ["mcp__plugin_livedocs_livedocs__resolve_source"], "an answer", True,
+                [{"name": "resolve_source", "input": {"library": "@types", "version": "node@20"}}])
+    r = run_case(case, runs=2, cwd=None, run_fn=mis_split)
+    assert r["trigger_rate"] == 1.0
+    assert r["correctness_rate"] == 0.0   # right tool, wrong args → wrong
+
+    def correct(prompt, cwd=None):
+        return (True, ["mcp__plugin_livedocs_livedocs__resolve_source"], "an answer", True,
+                [{"name": "resolve_source", "input": {"library": "@types/node", "version": "20"}}])
+    r2 = run_case(case, runs=2, cwd=None, run_fn=correct)
+    assert r2["correctness_rate"] == 1.0

@@ -192,6 +192,9 @@
   category: explicit
   expected_trigger: true
   expected_tools: [resolve_source, fetch_docs]
+  # resolve_source must carry the parsed name + pin, not a mis-split (issue #38 verify).
+  expected_args:
+    resolve_source: {library: react, version: "18"}
   oracle: {type: structural}
 
 - id: explicit-lookup-cran-zh
@@ -200,6 +203,10 @@
   category: explicit
   expected_trigger: true
   expected_tools: [resolve_source, fetch_docs]
+  # A non-npm/pypi package: the agent MUST name the ecosystem (cran); dropping it
+  # fires the same tool but resolves wrong — caught by the arg check (issue #38 verify).
+  expected_args:
+    resolve_source: {library: dplyr, ecosystem: cran}
   oracle: {type: structural}
 
 - id: explicit-lookup-docs-url-en
@@ -234,6 +241,11 @@
   category: explicit
   expected_trigger: true
   expected_tools: [resolve_source, fetch_docs]
+  # THE last-@ mis-split catcher: library must be the full "@types/node" (leading
+  # @ kept, split at the LAST @), version "20". A mis-split (@types / node@20)
+  # fires the same resolve_source and slips past the route check (issue #38 verify).
+  expected_args:
+    resolve_source: {library: "@types/node", version: "20"}
   oracle: {type: structural}
 
 - id: explicit-lookup-crates-pin-en
@@ -246,6 +258,10 @@
   category: explicit
   expected_trigger: true
   expected_tools: [resolve_source, fetch_docs]
+  # Ecosystem (crates) MUST be named AND the pin passed: a dropped ecosystem or a
+  # dropped/mis-applied version fires the same tool but is wrong (issue #38 verify).
+  expected_args:
+    resolve_source: {library: serde, ecosystem: crates, version: "1.0.100"}
   oracle: {type: structural}
 
 - id: explicit-lookup-shadow-gh-en
