@@ -37,7 +37,7 @@ final class CheLiveDocsMCPServer {
                             .string("rubygems"), .string("jsr"), .string("packagist"), .string("maven"), .string("cran")]),
             "description": .string("Package registry the library lives in. npm/pypi auto-detect if omitted; crates/go/rubygems/jsr/packagist/maven/cran MUST be named explicitly. Library format per ecosystem: npm 'react' or '@scope/name'; go full module path 'github.com/gin-gonic/gin'; jsr '@scope/name'; packagist 'vendor/package'; maven 'group:artifact'; cran (R) 'dplyr'.")
         ])
-        let versionProp: Value = .object(["type": .string("string"), "description": .string("Pin to a specific version, e.g. '18.3.1' (React 18 vs 19). Honored for npm/pypi; other ecosystems are latest-only. llms.txt docs are always latest and get labeled as not-pinned.")])
+        let versionProp: Value = .object(["type": .string("string"), "description": .string("Pin to a specific version, e.g. '18.3.1' (React 18 vs 19). Honored for npm/pypi/crates/go/rubygems (confirmed at their per-version endpoints; latest_version returns pin_honored:true/false); jsr/packagist/maven/cran are latest-only and report pin_honored:false. llms.txt docs are always latest and get labeled as not-pinned.")])
         return [
             Tool(
                 name: "resolve_source",
@@ -66,7 +66,7 @@ final class CheLiveDocsMCPServer {
             ),
             Tool(
                 name: "latest_version",
-                description: "The deterministic 'what is the latest released version right now' answer for a library, from its package registry, plus changelog/repo URLs. This is the strongest currency signal — more reliable than scraping a docs page.",
+                description: "The deterministic 'what is the latest released version right now' answer for a library, from its package registry, plus changelog/repo URLs. This is the strongest currency signal — more reliable than scraping a docs page. When you pass a version pin, the response includes pin_honored (true = confirmed at the ecosystem's per-version endpoint and 'version' is the pin; false = latest-only ecosystem or version not found, 'version' is latest).",
                 inputSchema: .object([
                     "type": .string("object"),
                     "properties": .object([

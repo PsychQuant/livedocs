@@ -88,7 +88,7 @@ never installs).
    | The question is about… | Call |
    |---|---|
    | "what's the latest version / did X change / what's new" | `latest_version` (exact version + changelog URL) |
-   | a **specific version** (e.g. React 18 vs 19) | any of the below + `version:"18.3.1"` (honored for npm/pypi registry+repo; llms.txt is always latest and gets labeled) |
+   | a **specific version** (e.g. React 18 vs 19) | any of the below + `version:"18.3.1"` (honored for npm/pypi/crates/go/rubygems — see `latest_version`'s `pin_honored`; llms.txt/repo URLs are always latest and get labeled) |
    | how to use / configure / general docs | `resolve_source` → then `fetch_docs` on the top result |
    | exact API surface — endpoints, request/response shape | `introspect` (kind=openapi or graphql) |
    | a CLI's flags / subcommands / installed version | `introspect` (kind=cli, target = bare command) |
@@ -150,8 +150,13 @@ any remaining tokens are a **topic filter** applied when reading the fetched doc
    result. Identifying the ecosystem is **your** fuzzy step per **Decision flow**
    step 1: npm/pypi auto-detect, every other ecosystem must be named by you in
    the call (e.g. `dplyr` → `ecosystem:"cran"`). Version pins are honored by the
-   npm/pypi registry legs only; for other ecosystems the registry serves latest —
-   state that the pin was not applied.
+   npm/pypi/crates/go/rubygems registry legs (each confirmed at its per-version
+   endpoint); jsr/packagist/maven/cran serve latest only. `latest_version`
+   returns `pin_honored` (true = the pin was confirmed and `version` is the pin;
+   false = latest-only ecosystem or version not found) — trust that boolean
+   rather than guessing, and note when a pin was not applied. Either way the
+   docs/repo URLs remain latest (default-branch), so llms/repo sources stay
+   labeled not-pinned even for a honored registry pin.
    **CLI fallback**: package resolution returned `{"sources":[]}` AND the token
    names an installed command → `introspect{kind:"cli", target:<token>}`.
 
@@ -170,8 +175,9 @@ DESCRIPTION `Depends` is only a lower-bound cross-check (never the effective
 version), and with no toolchain the honest not-resolved degrade applies ·
 `/livedocs:look-up javascript` → engine alias to the `node` adapter, anchored to
 the local Node version · `/livedocs:look-up react@18` → registry docs pinned to 18 ·
-`/livedocs:look-up serde@1.0.100` → you name `ecosystem:"crates"`; registry
-serves latest — state that the pin was not applied ·
+`/livedocs:look-up serde@1.0.100` → you name `ecosystem:"crates"`; the pin is
+confirmed at the crates per-version endpoint (`pin_honored:true`, `version` is
+1.0.100) while the docs/repo URLs stay latest-labeled ·
 `/livedocs:look-up dplyr mutate` → you name `ecosystem:"cran"`, resolve dplyr,
 read docs for `mutate` · `/livedocs:look-up https://api.example.com/openapi.json`
 → OpenAPI introspection · `/livedocs:look-up https://hono.dev` → docs-site

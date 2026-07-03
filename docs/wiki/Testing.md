@@ -2,17 +2,17 @@
 
 # Testing
 
-LiveDocs has two independent test suites — **160 tests, all green**. The Swift suite verifies
+LiveDocs has two independent test suites — **168 tests, all green**. The Swift suite verifies
 the engine; the Python suite verifies that the `look-up` *skill* actually triggers a
 LiveDocs query and answers currently, plus the vs-context7 comparison harness. Counts below
 are a snapshot; the source of truth is running the suites.
 
 ```bash
-swift test                                  # 119 Swift tests
+swift test                                  # 127 Swift tests
 python3 -m pytest evals/look-up/tests/  # 41 Python eval tests
 ```
 
-## Swift — 119 tests (`swift test`)
+## Swift — 127 tests (`swift test`)
 
 Split along the pure-core / MCP-shell architecture. `LiveDocsCore` is dependency-free and
 tested without a network (HTTP is injected as a fake); `CheLiveDocsMCP` covers the process
@@ -23,13 +23,13 @@ and file-system layer.
 | File | Tests | Covers |
 |------|------:|--------|
 | `RuntimeIntrospectionTests` | 30 | Language-runtime detection: pin parsers (`.tool-versions`, mise, idiomatic `.<lang>-version`), the precedence engine (active toolchain authoritative), mise inline-comment / array rejection, multi-line / alias rejection, R toolchain-banner parsing + DESCRIPTION `Depends` constraint, javascript→node canonicalization before the safety gate. |
-| `RegistryAdaptersTests` | 11 | Parsers for all 9 registries (npm / PyPI / crates / go / rubygems / JSR / packagist / maven / CRAN). |
+| `RegistryAdaptersTests` | 15 | Parsers for all 9 registries (npm / PyPI / crates / go / rubygems / JSR / packagist / maven / CRAN), the three per-version confirm parsers (crates/go/rubygems pins), and `supportsVersionPin` coverage. |
 | `URLSafetyTests` | 9 | SSRF guard: scheme allowlist + loopback / link-local (`169.254`) / RFC-1918 / ULA / metadata host classification. |
 | `TextSanitizeTests` | 7 | Control / ANSI / OSC / bidi / zero-width stripping of fetched content + UTF-8 byte truncation. |
 | `LLMSTxtTests` | 6 | `llms.txt` candidate ordering, soft-404 content-type guard, index/full flavor split. |
 | `IntrospectionTests` | 6 | OpenAPI / GraphQL schema parsing (method allowlist, shape-only, deterministic ordering). |
 | `RIntrospectionTests` | 6 | Installed-R-package version parsing + safe-name validation. |
-| `EngineTests` | 5 | Discovery chain over injected HTTP fakes (registry → llms.txt → repo). |
+| `EngineTests` | 9 | Discovery chain over injected HTTP fakes (registry → llms.txt → repo), plus non-npm/pypi version-pin honoring (`pin_honored` true/false/nil). |
 | `ETagCacheTests` | 5 | ETag revalidation semantics (304 → cached, 200 → refresh, never blind-stale, POST never cached). |
 | `RegistryTests` | 5 | Per-ecosystem registry resolution + version pinning. |
 | `ClassificationTests` | 4 | Soft-404 hit/miss classification. |
