@@ -57,7 +57,7 @@ Then use the `look-up` skill; it routes questions to the right tool.
 
 - [Version Reconciliation](Version-Reconciliation): the auto-detect update flow.
 - [Primary-Source Spectrum](Primary-Source-Spectrum): what LiveDocs is and isn't for.
-- [Testing](Testing): the test suites (177 tests) and what each covers.
+- [Testing](Testing): the test suites (181 tests) and what each covers.
 
 ## More
 

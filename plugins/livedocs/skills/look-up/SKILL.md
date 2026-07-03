@@ -174,7 +174,9 @@ adapter — anchored to the local R toolchain version when R/Rscript is installe
 DESCRIPTION `Depends` is only a lower-bound cross-check (never the effective
 version), and with no toolchain the honest not-resolved degrade applies ·
 `/livedocs:look-up javascript` → engine alias to the `node` adapter, anchored to
-the local Node version · `/livedocs:look-up react@18` → registry docs pinned to 18 ·
+the local Node version · `/livedocs:look-up react@18.3.1` → registry pins the
+exact version (`pin_honored:true`); a partial `react@18` or a dist-tag isn't an
+exact version and comes back `pin_honored:false` ·
 `/livedocs:look-up serde@1.0.100` → you name `ecosystem:"crates"`; the pin is
 confirmed at the crates per-version endpoint (`pin_honored:true`, `version` is
 1.0.100) while the docs/repo URLs stay latest-labeled ·

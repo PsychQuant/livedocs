@@ -46,8 +46,9 @@ final class LatestVersionEncodingTests: XCTestCase {
         XCTAssertEqual(obj["pin_honored"] as? Bool, false)
         XCTAssertEqual(obj["version"] as? String, "1.0.228")
         let note = obj["note"] as? String ?? ""
-        XCTAssertTrue(note.contains("wasn't found"), note)
+        XCTAssertTrue(note.contains("not confirmed as an exact version"), note)
         XCTAssertFalse(note.contains("only npm/pypi"), "the stale 'only npm/pypi honor a pin' claim must be gone")
+        XCTAssertFalse(note.contains("is the latest"), "a pin-supporting ecosystem false must not over-claim 'version is latest' (may be a dist-tag)")
     }
 
     func testLatestOnlyEcosystemEmitsPinHonoredFalseWithLatestOnlyNote() {
@@ -129,6 +130,61 @@ final class LatestVersionEncodingTests: XCTestCase {
         let res = await DiscoveryEngine(http: FakeHTTP(routes: http))
             .latestVersion(library: "react", ecosystem: .npm, version: "99.0.0")
         XCTAssertEqual(res?.version, "19.0.0")
+        XCTAssertEqual(res?.pinHonored, false)
+    }
+
+    func testNpmDistTagIsNotAFakePin() async {
+        // /react/beta 200s but resolves to a MOVING concrete version — reporting
+        // pin_honored:true would fake an immutable pin (issue #36 round-2 / Codex).
+        let http: [String: HTTPResponse] = [
+            "https://registry.npmjs.org/react/beta":
+                HTTPResponse(status: 200, contentType: "application/json", body: Data(#"{"version":"19.2.0-beta.1"}"#.utf8)),
+        ]
+        let res = await DiscoveryEngine(http: FakeHTTP(routes: http))
+            .latestVersion(library: "react", ecosystem: .npm, version: "beta")
+        XCTAssertEqual(res?.version, "19.2.0-beta.1")   // the resolved tag, honestly
+        XCTAssertEqual(res?.pinHonored, false, "a dist-tag is not a confirmed immutable pin")
+    }
+
+    func testNpmExactPinConfirmed() async {
+        let http: [String: HTTPResponse] = [
+            "https://registry.npmjs.org/react/18.3.1":
+                HTTPResponse(status: 200, contentType: "application/json", body: Data(#"{"version":"18.3.1"}"#.utf8)),
+        ]
+        let res = await DiscoveryEngine(http: FakeHTTP(routes: http))
+            .latestVersion(library: "react", ecosystem: .npm, version: "18.3.1")
+        XCTAssertEqual(res?.version, "18.3.1")
+        XCTAssertEqual(res?.pinHonored, true)
+    }
+
+    // MARK: - RubyGems end-to-end pin (coverage parity with crates/go)
+
+    func testRubyGemsPinHonoredEndToEnd() async {
+        let http: [String: HTTPResponse] = [
+            "https://rubygems.org/api/v1/gems/rails.json":
+                HTTPResponse(status: 200, contentType: "application/json",
+                             body: Data(#"{"name":"rails","version":"8.1.3","source_code_uri":"https://github.com/rails/rails"}"#.utf8)),
+            "https://rubygems.org/api/v2/rubygems/rails/versions/7.0.0.json":
+                HTTPResponse(status: 200, contentType: "application/json",
+                             body: Data(#"{"name":"rails","number":"7.0.0"}"#.utf8)),
+        ]
+        let res = await DiscoveryEngine(http: FakeHTTP(routes: http))
+            .latestVersion(library: "rails", ecosystem: .rubygems, version: "7.0.0")
+        XCTAssertEqual(res?.version, "7.0.0")
+        XCTAssertEqual(res?.pinHonored, true)
+        XCTAssertEqual(res?.repository, "https://github.com/rails/rails")  // repo from latest-level
+    }
+
+    func testRubyGemsPinNotFoundFalse() async {
+        let http: [String: HTTPResponse] = [
+            "https://rubygems.org/api/v1/gems/rails.json":
+                HTTPResponse(status: 200, contentType: "application/json",
+                             body: Data(#"{"name":"rails","version":"8.1.3"}"#.utf8)),
+            // no v2 route for 0.0.1 → confirm 404
+        ]
+        let res = await DiscoveryEngine(http: FakeHTTP(routes: http))
+            .latestVersion(library: "rails", ecosystem: .rubygems, version: "0.0.1")
+        XCTAssertEqual(res?.version, "8.1.3")
         XCTAssertEqual(res?.pinHonored, false)
     }
 }

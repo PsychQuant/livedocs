@@ -2,17 +2,17 @@
 
 # Testing
 
-LiveDocs has two independent test suites — **177 tests, all green**. The Swift suite verifies
+LiveDocs has two independent test suites — **181 tests, all green**. The Swift suite verifies
 the engine; the Python suite verifies that the `look-up` *skill* actually triggers a
 LiveDocs query and answers currently, plus the vs-context7 comparison harness. Counts below
 are a snapshot; the source of truth is running the suites.
 
 ```bash
-swift test                                  # 136 Swift tests
+swift test                                  # 140 Swift tests
 python3 -m pytest evals/look-up/tests/  # 41 Python eval tests
 ```
 
-## Swift — 136 tests (`swift test`)
+## Swift — 140 tests (`swift test`)
 
 Split along the pure-core / MCP-shell architecture. `LiveDocsCore` is dependency-free and
 tested without a network (HTTP is injected as a fake); `CheLiveDocsMCP` covers the process
@@ -37,13 +37,13 @@ and file-system layer.
 | `ValidationTests` | 4 | Boundary validation (package/version strings can't inject URL structure). |
 | `RankingTests` | 2 | Fidelity-then-freshness ranking with a stable tiebreak. |
 
-### `CheLiveDocsMCPTests` — 24 (process / file layer)
+### `CheLiveDocsMCPTests` — 28 (process / file layer)
 
 | File | Tests | Covers |
 |------|------:|--------|
 | `RuntimeIntrospectTests` | 11 | Symlink version-file refusal (secret-exfil guard), uncovered-language fallback to the universal pin layer, canonical `mise.toml`, PATH-first executable resolution, uppercase-id acceptance with requested-id preservation (R / JavaScript), javascript↔node resolution equivalence. |
 | `ProcessRunnerTests` | 4 | Large output doesn't deadlock (concurrent pipe drain), exit code surfaces, timeout reported, SIGTERM→SIGKILL escalation. |
-| `LatestVersionEncodingTests` | 9 | `latest_version` tool boundary: `pin_honored` true/false/nil surfacing, the Go `v`-prefix confirmed-pin case (must not read as not-applied), v-prefixed input building a valid confirm URL, npm not-found pin falling back to latest+false. |
+| `LatestVersionEncodingTests` | 13 | `latest_version` tool boundary: `pin_honored` true/false/nil surfacing, the Go `v`-prefix confirmed-pin case (must not read as not-applied), v-prefixed input building a valid confirm URL, npm not-found → latest+false, npm dist-tag / exact-pin discrimination (a moving tag is never a faked pin), RubyGems end-to-end pin (honored + not-found). |
 
 ## Python — 41 tests (`pytest evals/look-up/`)
 

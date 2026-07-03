@@ -250,11 +250,19 @@ final class CheLiveDocsMCPServer {
         // note alongside the machine-readable pin_honored:false. Auto-detect (nil
         // eco) only tries npm/pypi, which DO support pins → treat as pin-supporting.
         if let pin, res.pinHonored == false {
-            let latestOnly = !(eco?.supportsVersionPin ?? true)
-            let reason = latestOnly
-                ? "this ecosystem is latest-only (jsr/packagist/maven/cran)"
-                : "the version wasn't found in this ecosystem"
-            return encodeResolution(res, note: "Pin '\(pin)' not applied — \(reason); 'version' is the latest. npm/pypi/crates/go/rubygems honor a confirmed pin.")
+            // Two false sub-cases. Latest-only ecosystems never attempt a pin, so
+            // 'version' is definitively the latest. For pin-supporting ecosystems a
+            // false means the pin wasn't confirmed as an exact version — it may be a
+            // dist-tag/range that resolved to some OTHER concrete version, or an
+            // unknown version that fell back to latest; either way 'version' is the
+            // registry's resolution, not a confirmed pin (don't over-claim "latest").
+            let note: String
+            if !(eco?.supportsVersionPin ?? true) {
+                note = "Pin '\(pin)' not applied — this ecosystem is latest-only (jsr/packagist/maven/cran); 'version' is the latest. npm/pypi/crates/go/rubygems honor a confirmed pin."
+            } else {
+                note = "Pin '\(pin)' not confirmed as an exact version (it may be a dist-tag, partial version, or an unknown version); 'version' is the registry's current resolution, not a confirmed pin."
+            }
+            return encodeResolution(res, note: note)
         }
         return encodeResolution(res)
     }

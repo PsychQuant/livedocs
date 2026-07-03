@@ -180,31 +180,15 @@ public struct DiscoveryEngine: Sendable {
     private func fetchRegistry(eco: Ecosystem, library: String, version: String?) async -> RegistryResolution? {
         switch eco {
         case .npm:
-            // npm/PyPI honor a pin directly through a per-version URL: a 200 means
-            // this document IS the pinned version. On a miss we fall back to latest
-            // with pinHonored=false — symmetric with the confirm-probe ecosystems,
-            // never a bare nil that would hide the pin outcome (issue #36 verify).
-            if let pin = version {
-                if var res = await getParse("https://registry.npmjs.org/\(library)/\(pinForURL(pin))", parseNpmLatest) {
-                    res.pinHonored = true
-                    return res
-                }
-                guard var latest = await getParse("https://registry.npmjs.org/\(library)/latest", parseNpmLatest) else { return nil }
-                latest.pinHonored = false
-                return latest
-            }
-            return await getParse("https://registry.npmjs.org/\(library)/latest", parseNpmLatest)
+            return await fetchDirectPin(
+                pinnedURL: { "https://registry.npmjs.org/\(library)/\($0)" },
+                latestURL: "https://registry.npmjs.org/\(library)/latest",
+                parse: parseNpmLatest, version: version)
         case .pypi:
-            if let pin = version {
-                if var res = await getParse("https://pypi.org/pypi/\(library)/\(pinForURL(pin))/json", parsePyPI) {
-                    res.pinHonored = true
-                    return res
-                }
-                guard var latest = await getParse("https://pypi.org/pypi/\(library)/json", parsePyPI) else { return nil }
-                latest.pinHonored = false
-                return latest
-            }
-            return await getParse("https://pypi.org/pypi/\(library)/json", parsePyPI)
+            return await fetchDirectPin(
+                pinnedURL: { "https://pypi.org/pypi/\(library)/\($0)/json" },
+                latestURL: "https://pypi.org/pypi/\(library)/json",
+                parse: parsePyPI, version: version)
         case .crates:
             return await fetchWithPinConfirm(
                 latestURL: "https://crates.io/api/v1/crates/\(library)", latestParse: parseCratesIo,
@@ -229,7 +213,7 @@ public struct DiscoveryEngine: Sendable {
                 // any leading `v` on the input first (else v1.9.1 → …/@v/vv1.9.1.info,
                 // a guaranteed 404 — issue #36 verify).
                 if let confirmed = await confirmPin(
-                    "https://proxy.golang.org/\(goEscape(library))/@v/v\(pinForURL(pin)).info", parseGoVersionInfo, wants: pin) {
+                    "https://proxy.golang.org/\(goEscape(library))/@v/v\(stripLeadingV(pin)).info", parseGoVersionInfo, wants: pin) {
                     res.version = confirmed   // keeps Go's v-prefix
                     res.pinHonored = true
                 } else {
@@ -248,6 +232,28 @@ public struct DiscoveryEngine: Sendable {
         }
     }
 
+    /// npm/PyPI honor a pin through a per-version URL that returns the package
+    /// doc directly. Unlike the confirm-probe ecosystems, that doc carries its own
+    /// version, so we compare it to the requested pin: an exact match →
+    /// pinHonored=true; a mismatch → NOT a confirmed immutable pin (npm dist-tags
+    /// like `beta`/`next`/`latest`, and partial pins like `18`, also 200 here but
+    /// resolve to a moving/other concrete version — reporting them as honored
+    /// would be a faked pin, issue #36 round-2). On an outright miss we fall back
+    /// to latest with pinHonored=false, never a bare nil that hides the outcome.
+    private func fetchDirectPin(
+        pinnedURL: (String) -> String, latestURL: String,
+        parse: (Data) throws -> RegistryResolution, version: String?
+    ) async -> RegistryResolution? {
+        guard let pin = version else { return await getParse(latestURL, parse) }
+        if var res = await getParse(pinnedURL(stripLeadingV(pin)), parse) {
+            res.pinHonored = res.version.map { versionsEqual($0, pin) } ?? false
+            return res
+        }
+        guard var latest = await getParse(latestURL, parse) else { return nil }
+        latest.pinHonored = false
+        return latest
+    }
+
     /// Fetch the latest-level resolution (repo/docs), then — if a pin was
     /// requested — confirm it at the per-version endpoint. On confirmation,
     /// override `version` with the confirmed pin and set `pinHonored=true`;
@@ -261,7 +267,7 @@ public struct DiscoveryEngine: Sendable {
         if let pin = version {
             // A leading `v` never appears in crates/rubygems version URLs; strip it
             // so a v-prefixed input (accepted by isSafeVersion) still matches.
-            if let confirmed = await confirmPin(confirmURL(pinForURL(pin)), confirmParse, wants: pin) {
+            if let confirmed = await confirmPin(confirmURL(stripLeadingV(pin)), confirmParse, wants: pin) {
                 res.version = confirmed
                 res.pinHonored = true
             } else {
@@ -271,15 +277,22 @@ public struct DiscoveryEngine: Sendable {
         return res
     }
 
-    /// Normalize a version pin for interpolation into a per-version registry URL:
-    /// drop a single leading `v` when it prefixes a digit (Go tags are written
-    /// `v1.9.1` everywhere, but only the Go proxy path wants the `v` — and it adds
-    /// its own). crates/rubygems/npm/pypi version identifiers never carry a `v`.
-    private func pinForURL(_ pin: String) -> String {
-        if pin.hasPrefix("v"), let second = pin.dropFirst().first, second.isNumber {
-            return String(pin.dropFirst())
+    /// Normalize a version string for interpolation into a per-version registry
+    /// URL or for pin equality: drop a single leading `v` when it prefixes a digit
+    /// (Go tags are written `v1.9.1` everywhere, but only the Go proxy path wants
+    /// the `v` — and it adds its own; crates/rubygems/npm/pypi identifiers never
+    /// carry a `v`). Used by BOTH the URL builders and `confirmPin`/`versionsEqual`
+    /// so the normalization can't drift between them (issue #36 round-2).
+    private func stripLeadingV(_ s: String) -> String {
+        if s.hasPrefix("v"), let second = s.dropFirst().first, second.isNumber {
+            return String(s.dropFirst())
         }
-        return pin
+        return s
+    }
+
+    /// Two version strings are equal modulo a leading `v` (e.g. `v1.9.1` == `1.9.1`).
+    private func versionsEqual(_ a: String, _ b: String) -> Bool {
+        stripLeadingV(a) == stripLeadingV(b)
     }
 
     /// Confirm a pinned version exists at a per-version endpoint. Returns the
@@ -289,8 +302,7 @@ public struct DiscoveryEngine: Sendable {
     private func confirmPin(_ url: String, _ parse: (Data) -> String?, wants: String) async -> String? {
         guard let resp = try? await http.get(url), resp.status == 200,
               let got = parse(resp.body) else { return nil }
-        let strip: (String) -> Substring = { $0.hasPrefix("v") ? $0.dropFirst() : $0[...] }
-        return strip(got) == strip(wants) ? got : nil
+        return versionsEqual(got, wants) ? got : nil
     }
 
     private func getParse(_ url: String, _ parse: (Data) throws -> RegistryResolution) async -> RegistryResolution? {

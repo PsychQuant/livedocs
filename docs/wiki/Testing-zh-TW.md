@@ -2,16 +2,16 @@
 
 # 測試
 
-LiveDocs 有兩套獨立 test suite —— **177 個 test,全綠**。Swift suite 驗證引擎;Python suite
+LiveDocs 有兩套獨立 test suite —— **181 個 test,全綠**。Swift suite 驗證引擎;Python suite
 驗證 `look-up` *skill* 是否真的會激起 LiveDocs 查詢並給出現行答案, 外加 vs-context7 比較
 harness。以下計數是快照;真正的 source of truth 是實際跑一次。
 
 ```bash
-swift test                                  # 136 個 Swift test
+swift test                                  # 140 個 Swift test
 python3 -m pytest evals/look-up/tests/  # 41 個 Python eval test
 ```
 
-## Swift — 136 個 test（`swift test`）
+## Swift — 140 個 test（`swift test`）
 
 依 pure-core / MCP-shell 架構分兩層。`LiveDocsCore` 無依賴、不碰網路(HTTP 用 fake 注入);
 `CheLiveDocsMCP` 覆蓋 process 與檔案系統層。
@@ -35,13 +35,13 @@ python3 -m pytest evals/look-up/tests/  # 41 個 Python eval test
 | `ValidationTests` | 4 | 邊界驗證(package/version 字串無法注入 URL 結構)。 |
 | `RankingTests` | 2 | fidelity → freshness 排序 + 穩定 tiebreak。 |
 
-### `CheLiveDocsMCPTests` — 24（process / 檔案層）
+### `CheLiveDocsMCPTests` — 28（process / 檔案層）
 
 | 檔案 | 數 | 測什麼 |
 |------|---:|--------|
 | `RuntimeIntrospectTests` | 11 | symlink 版本檔拒絕(防機密外洩)、未覆蓋語言 fallback 到 universal pin layer、canonical `mise.toml`、PATH-first executable 解析、大寫 id 接受且保留請求原 id(R / JavaScript)、javascript↔node 解析等價。 |
 | `ProcessRunnerTests` | 4 | 大輸出不 deadlock(並發讀 pipe)、exit code 浮現、timeout 回報、SIGTERM→SIGKILL escalation。 |
-| `LatestVersionEncodingTests` | 9 | `latest_version` 工具邊界:pin_honored true/false/nil surfacing、Go `v`-prefix 已確認 pin(不可誤判成 not-applied)、v-prefix 輸入建出正確 confirm URL、npm 找不到 pin 退回 latest+false。 |
+| `LatestVersionEncodingTests` | 13 | `latest_version` 工具邊界:pin_honored true/false/nil surfacing、Go `v`-prefix 已確認 pin(不可誤判成 not-applied)、v-prefix 輸入建出正確 confirm URL、npm 找不到→latest+false、npm dist-tag/exact-pin 區分(移動 tag 絕不假裝成 pin)、RubyGems 端到端 pin(honored + not-found)。 |
 
 ## Python — 41 個 test（`pytest evals/look-up/`）
 
