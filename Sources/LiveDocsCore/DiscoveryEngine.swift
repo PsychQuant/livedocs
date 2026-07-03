@@ -11,9 +11,16 @@ public enum Ecosystem: String, Sendable, CaseIterable {
     static let autoOrder: [Ecosystem] = [.npm, .pypi]
 
     /// Whether a specific version can be pinned deterministically for this
-    /// ecosystem. npm/PyPI have first-class per-version endpoints; the rest are
-    /// latest-only here (honest: we don't fake a pin we can't honor).
-    var supportsVersionPin: Bool { self == .npm || self == .pypi }
+    /// ecosystem. npm/PyPI/crates/Go/RubyGems have first-class per-version
+    /// endpoints (issue #36); jsr/packagist/maven/cran stay latest-only here
+    /// (their per-version endpoints are more indirect) — honest: we don't fake a
+    /// pin we can't confirm.
+    public var supportsVersionPin: Bool {
+        switch self {
+        case .npm, .pypi, .crates, .go, .rubygems: return true
+        case .jsr, .packagist, .maven, .cran: return false
+        }
+    }
 }
 
 /// What the caller (the router skill, via the MCP tool) asks the engine to
@@ -153,35 +160,66 @@ public struct DiscoveryEngine: Sendable {
 
         let order = ecosystem.map { [$0] } ?? Ecosystem.autoOrder
         for eco in order {
-            if let res = await fetchRegistry(eco: eco, library: library, version: version) { return res }
+            if var res = await fetchRegistry(eco: eco, library: library, version: version) {
+                // Latest-only ecosystems: a requested pin could not be honored.
+                // Say so explicitly instead of leaving the signal absent (issue #36).
+                if version != nil, !eco.supportsVersionPin { res.pinHonored = false }
+                return res
+            }
         }
         return nil
     }
 
-    /// One ecosystem's fetch+parse. A version pin is honored only where it's a
-    /// first-class endpoint (npm/PyPI); elsewhere it's ignored and latest is used.
+    /// One ecosystem's fetch+parse. A version pin is honored where the ecosystem
+    /// has a first-class per-version endpoint (npm/PyPI directly; crates/Go/
+    /// RubyGems via a confirm probe) — `pinHonored` records the outcome. Where a
+    /// pin can't be confirmed we return latest with `pinHonored=false`, never a
+    /// faked pin (issue #36).
     private func fetchRegistry(eco: Ecosystem, library: String, version: String?) async -> RegistryResolution? {
-        let pin = eco.supportsVersionPin ? version : nil
         switch eco {
         case .npm:
-            let url = pin.map { "https://registry.npmjs.org/\(library)/\($0)" }
-                ?? "https://registry.npmjs.org/\(library)/latest"
-            return await getParse(url, parseNpmLatest)
+            // npm/PyPI honor a pin directly through a per-version URL: a 200 means
+            // this document IS the pinned version.
+            if let pin = version {
+                guard var res = await getParse("https://registry.npmjs.org/\(library)/\(pin)", parseNpmLatest) else { return nil }
+                res.pinHonored = true
+                return res
+            }
+            return await getParse("https://registry.npmjs.org/\(library)/latest", parseNpmLatest)
         case .pypi:
-            let url = pin.map { "https://pypi.org/pypi/\(library)/\($0)/json" }
-                ?? "https://pypi.org/pypi/\(library)/json"
-            return await getParse(url, parsePyPI)
+            if let pin = version {
+                guard var res = await getParse("https://pypi.org/pypi/\(library)/\(pin)/json", parsePyPI) else { return nil }
+                res.pinHonored = true
+                return res
+            }
+            return await getParse("https://pypi.org/pypi/\(library)/json", parsePyPI)
         case .crates:
-            return await getParse("https://crates.io/api/v1/crates/\(library)", parseCratesIo)
+            return await fetchWithPinConfirm(
+                latestURL: "https://crates.io/api/v1/crates/\(library)", latestParse: parseCratesIo,
+                version: version,
+                confirmURL: { "https://crates.io/api/v1/crates/\(library)/\($0)" }, confirmParse: parseCratesVersion)
         case .rubygems:
-            return await getParse("https://rubygems.org/api/v1/gems/\(library).json", parseRubyGems)
+            return await fetchWithPinConfirm(
+                latestURL: "https://rubygems.org/api/v1/gems/\(library).json", latestParse: parseRubyGems,
+                version: version,
+                confirmURL: { "https://rubygems.org/api/v2/rubygems/\(library)/versions/\($0).json" },
+                confirmParse: parseRubyGemsVersion)
         case .go:
-            var res = await getParse("https://proxy.golang.org/\(goEscape(library))/@latest", parseGoProxy)
+            guard var res = await getParse("https://proxy.golang.org/\(goEscape(library))/@latest", parseGoProxy) else { return nil }
             // The proxy omits Origin for some pseudo-versions/older modules. For a
             // module HOSTED on a known forge, the module path itself is the repo —
             // don't throw that away.
-            if res != nil, res?.repository == nil, let repo = goRepoFromModulePath(library) {
-                res?.repository = repo
+            if res.repository == nil, let repo = goRepoFromModulePath(library) {
+                res.repository = repo
+            }
+            if let pin = version {
+                if let confirmed = await confirmPin(
+                    "https://proxy.golang.org/\(goEscape(library))/@v/v\(pin).info", parseGoVersionInfo, wants: pin) {
+                    res.version = confirmed   // keeps Go's v-prefix
+                    res.pinHonored = true
+                } else {
+                    res.pinHonored = false
+                }
             }
             return res
         case .packagist:
@@ -193,6 +231,38 @@ public struct DiscoveryEngine: Sendable {
         case .cran:
             return await getParse("https://crandb.r-pkg.org/\(library)", parseCRAN)
         }
+    }
+
+    /// Fetch the latest-level resolution (repo/docs), then — if a pin was
+    /// requested — confirm it at the per-version endpoint. On confirmation,
+    /// override `version` with the confirmed pin and set `pinHonored=true`;
+    /// otherwise keep latest and set `pinHonored=false`. Repo/docs URLs stay
+    /// latest-level (they're default-branch regardless of the pin).
+    private func fetchWithPinConfirm(
+        latestURL: String, latestParse: (Data) throws -> RegistryResolution,
+        version: String?, confirmURL: (String) -> String, confirmParse: @escaping (Data) -> String?
+    ) async -> RegistryResolution? {
+        guard var res = await getParse(latestURL, latestParse) else { return nil }
+        if let pin = version {
+            if let confirmed = await confirmPin(confirmURL(pin), confirmParse, wants: pin) {
+                res.version = confirmed
+                res.pinHonored = true
+            } else {
+                res.pinHonored = false
+            }
+        }
+        return res
+    }
+
+    /// Confirm a pinned version exists at a per-version endpoint. Returns the
+    /// endpoint's own version string on a match (so Go keeps its `v` prefix), or
+    /// nil if the endpoint 404s / reports a different version. A leading `v` is
+    /// normalized on both sides before comparison (Go tags are v-prefixed).
+    private func confirmPin(_ url: String, _ parse: (Data) -> String?, wants: String) async -> String? {
+        guard let resp = try? await http.get(url), resp.status == 200,
+              let got = parse(resp.body) else { return nil }
+        let strip: (String) -> Substring = { $0.hasPrefix("v") ? $0.dropFirst() : $0[...] }
+        return strip(got) == strip(wants) ? got : nil
     }
 
     private func getParse(_ url: String, _ parse: (Data) throws -> RegistryResolution) async -> RegistryResolution? {

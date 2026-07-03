@@ -11,19 +11,27 @@ public struct RegistryResolution: Sendable, Equatable {
     public var repository: String?
     public var changelog: String?
     public var documentation: String?
+    /// Whether a requested version pin was actually applied (issue #36).
+    /// `nil` = no pin was requested; `true` = the pin was confirmed at a
+    /// first-class per-version endpoint and `version` reflects it; `false` = a
+    /// pin was requested but not honored (latest-only ecosystem, or the version
+    /// wasn't found) and `version` is the latest. We never fake a pin.
+    public var pinHonored: Bool?
 
     public init(
         version: String? = nil,
         homepage: String? = nil,
         repository: String? = nil,
         changelog: String? = nil,
-        documentation: String? = nil
+        documentation: String? = nil,
+        pinHonored: Bool? = nil
     ) {
         self.version = version
         self.homepage = homepage
         self.repository = repository
         self.changelog = changelog
         self.documentation = documentation
+        self.pinHonored = pinHonored
     }
 }
 

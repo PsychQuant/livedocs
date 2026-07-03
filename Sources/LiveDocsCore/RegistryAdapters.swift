@@ -55,6 +55,35 @@ public func parseGoProxy(_ data: Data) throws -> RegistryResolution {
     )
 }
 
+// MARK: - Per-version confirm parsers (issue #36)
+// Each reads an ecosystem's FIRST-CLASS per-version endpoint and returns only
+// the version string it confirms (nil = malformed / not confirmable). Repo/docs
+// URLs stay latest-level (they're default-branch anyway), so these deliberately
+// extract nothing but the version — the honest "does this pin exist" check.
+
+/// crates.io per-version — `https://crates.io/api/v1/crates/<name>/<version>`.
+/// Shape: `{ "version": { "num": "1.0.100", ... } }`.
+public func parseCratesVersion(_ data: Data) -> String? {
+    guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+          let version = root["version"] as? [String: Any] else { return nil }
+    return version["num"] as? String
+}
+
+/// Go proxy per-version — `https://proxy.golang.org/<esc>/@v/v<version>.info`.
+/// Shape: `{ "Version": "v1.9.1", "Time": "..." }`. Keeps the `v` prefix (Go
+/// convention; matches the `@latest` version format the engine already returns).
+public func parseGoVersionInfo(_ data: Data) -> String? {
+    guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+    return root["Version"] as? String
+}
+
+/// RubyGems v2 per-version — `https://rubygems.org/api/v2/rubygems/<gem>/versions/<version>.json`.
+/// Shape: `{ "name": "rails", "number": "8.1.3", ... }` (`number`, not `version`).
+public func parseRubyGemsVersion(_ data: Data) -> String? {
+    guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+    return (root["number"] as? String) ?? (root["version"] as? String)
+}
+
 /// JSR (Deno) meta — `https://jsr.io/@<scope>/<name>/meta.json`. Only `.latest`
 /// here; the GitHub repo needs a second call (api.jsr.io) handled in the engine.
 public func parseJSRMeta(_ data: Data) throws -> RegistryResolution {

@@ -233,13 +233,18 @@ final class CheLiveDocsMCPServer {
     }
 
     private func encodeResolution(_ r: RegistryResolution) -> String {
-        jsonString([
+        var obj: [String: Any] = [
             "version": r.version as Any,
             "changelog": r.changelog as Any,
             "documentation": r.documentation as Any,
             "repository": r.repository as Any,
             "homepage": r.homepage as Any
-        ])
+        ]
+        // pin_honored is a pin-request-only fact: emit it only when a pin was
+        // actually requested (nil = no pin asked) so agents get a machine-readable
+        // signal instead of parsing note text (issue #36).
+        if let honored = r.pinHonored { obj["pin_honored"] = honored }
+        return jsonString(obj)
     }
 
     private func encodeOpenAPI(_ s: OpenAPISummary) -> String {

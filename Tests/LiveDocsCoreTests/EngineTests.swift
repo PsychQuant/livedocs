@@ -88,4 +88,67 @@ final class EngineTests: XCTestCase {
         let sources = await engine.resolveSources(.init(library: "does-not-exist", ecosystem: .npm))
         XCTAssertTrue(sources.isEmpty)   // → caller falls back to context7/web, labeled low-fidelity
     }
+
+    // MARK: - Non-npm/pypi version pins (issue #36)
+
+    private static let cratesLatest = #"{"crate":{"name":"serde","max_stable_version":"1.0.228","repository":"https://github.com/serde-rs/serde","documentation":"https://docs.rs/serde"}}"#
+
+    func testCratesPinHonoredWhenVersionConfirmed() async {
+        // A pinned crates request confirms the version at the per-version endpoint
+        // and reports THAT version with pin_honored = true.
+        let http = FakeHTTP(routes: [
+            "https://crates.io/api/v1/crates/serde":
+                HTTPResponse(status: 200, contentType: "application/json", body: Data(Self.cratesLatest.utf8)),
+            "https://crates.io/api/v1/crates/serde/1.0.100":
+                HTTPResponse(status: 200, contentType: "application/json",
+                             body: Data(#"{"version":{"num":"1.0.100"}}"#.utf8)),
+        ])
+        let engine = DiscoveryEngine(http: http)
+        let res = await engine.latestVersion(library: "serde", ecosystem: .crates, version: "1.0.100")
+        XCTAssertEqual(res?.version, "1.0.100")            // the confirmed pin, not latest
+        XCTAssertEqual(res?.pinHonored, true)
+        XCTAssertEqual(res?.repository, "https://github.com/serde-rs/serde")  // repo still from latest-level
+    }
+
+    func testCratesPinNotHonoredWhenVersionMissing() async {
+        // The pinned version 404s at the per-version endpoint → fall back to latest,
+        // pin_honored = false (never fake a pin we couldn't confirm).
+        let http = FakeHTTP(routes: [
+            "https://crates.io/api/v1/crates/serde":
+                HTTPResponse(status: 200, contentType: "application/json", body: Data(Self.cratesLatest.utf8)),
+            // no route for /serde/9.9.9 → 404
+        ])
+        let engine = DiscoveryEngine(http: http)
+        let res = await engine.latestVersion(library: "serde", ecosystem: .crates, version: "9.9.9")
+        XCTAssertEqual(res?.version, "1.0.228")            // latest, honestly
+        XCTAssertEqual(res?.pinHonored, false)
+    }
+
+    func testNoPinLeavesPinHonoredNil() async {
+        // Without a pin, pin_honored is absent (nil) — it's a pin-request-only fact.
+        let http = FakeHTTP(routes: [
+            "https://crates.io/api/v1/crates/serde":
+                HTTPResponse(status: 200, contentType: "application/json", body: Data(Self.cratesLatest.utf8)),
+        ])
+        let engine = DiscoveryEngine(http: http)
+        let res = await engine.latestVersion(library: "serde", ecosystem: .crates)
+        XCTAssertEqual(res?.version, "1.0.228")
+        XCTAssertNil(res?.pinHonored)
+    }
+
+    func testGoPinHonoredViaVersionInfo() async {
+        // Go confirms a pin at /<mod>/@v/vX.Y.Z.info; keeps the v-prefix.
+        let http = FakeHTTP(routes: [
+            "https://proxy.golang.org/github.com/gin-gonic/gin/@latest":
+                HTTPResponse(status: 200, contentType: "application/json",
+                             body: Data(#"{"Version":"v1.12.0"}"#.utf8)),
+            "https://proxy.golang.org/github.com/gin-gonic/gin/@v/v1.9.1.info":
+                HTTPResponse(status: 200, contentType: "application/json",
+                             body: Data(#"{"Version":"v1.9.1"}"#.utf8)),
+        ])
+        let engine = DiscoveryEngine(http: http)
+        let res = await engine.latestVersion(library: "github.com/gin-gonic/gin", ecosystem: .go, version: "1.9.1")
+        XCTAssertEqual(res?.version, "v1.9.1")
+        XCTAssertEqual(res?.pinHonored, true)
+    }
 }
