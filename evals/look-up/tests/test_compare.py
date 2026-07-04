@@ -182,25 +182,55 @@ def test_check_via_main_flags_drift(tmp_path):
 
 
 def test_check_write_require_emit_readme():
-    # #46 verify: --check / --write without --emit-readme must be a usage error
-    # (argparse SystemExit), NOT a silent exit-0 false pass.
+    # #46 verify: --check / --write without --emit-readme must be a NON-ZERO usage error,
+    # and --check + --write together is mutually exclusive. Round-2 DA: assert the exit
+    # CODE, not just that SystemExit was raised — sys.exit(0) is also a SystemExit, so a
+    # bare raises() check wouldn't catch the guard degrading to a false pass.
     import pytest
     from compare_context7 import main
-    with pytest.raises(SystemExit):
-        main(["--check"])
-    with pytest.raises(SystemExit):
-        main(["--write"])
+    for argv in (["--check"], ["--write"], ["--emit-readme", "--check", "--write"]):
+        with pytest.raises(SystemExit) as e:
+            main(argv)
+        assert e.value.code != 0, f"{argv} must fail loud (non-zero), got {e.value.code}"
 
 
 def test_render_readme_block_rejects_bad_captured_at():
     # #46 verify: a missing/malformed date must fail loud (never ship "captured None"),
-    # and a value carrying markup can't inject a sentinel into the emitted block.
+    # a value carrying markup can't inject a sentinel, and (round 2) a calendar-impossible
+    # or Unicode-digit date is rejected too.
     import pytest
     from compare_context7 import render_readme_block
     rows = [{"livedocs_current": True, "context7_current": False}]
-    for bad in (None, "", "captured None", "2026-07-02 --> <!-- END vs-context7 -->", "2026/07/02"):
+    for bad in (None, "", "captured None", "2026-07-02 --> <!-- END vs-context7 -->",
+                "2026/07/02", "2026-99-99", "9999-99-99", "٢٠٢٦-٠٧-٠٢"):
         with pytest.raises(ValueError):
             render_readme_block(rows, bad)
+    # a real ISO date still round-trips (no false positive)
+    assert "2026-07-02" in render_readme_block(rows, "2026-07-02")
+
+
+def test_check_flags_orphaned_second_block_via_main(tmp_path, monkeypatch):
+    # #46 verify round 2 (MEDIUM): an orphaned second BEGIN (stale chart, no matching END)
+    # still renders on GitHub — main --check must catch it (exit 1), not only complete pairs.
+    import compare_context7 as C
+    block = f"{C.README_BEGIN}\n```text\nchart\n```\n{C.README_END}"
+    readme = tmp_path / "README.md"
+    readme.write_text(f"# X\n{block}\n\n{C.README_BEGIN}\nstale 5/6\n", encoding="utf-8")  # 2 BEGIN, 1 END
+    monkeypatch.setattr(C, "readme_path", lambda: str(readme))
+    assert C.main(["--emit-readme", "--check"]) == 1
+
+
+def test_write_round_trips_via_main(tmp_path, monkeypatch):
+    # #46 verify round 2: drive the real --write path (+ _atomic_write) end-to-end, then
+    # --check must confirm in sync (exit 0). The write path was previously inspection-only.
+    import compare_context7 as C
+    stale = f"{C.README_BEGIN}\n```text\nstale\n```\n{C.README_END}"
+    readme = tmp_path / "README.md"
+    readme.write_text(f"# X\n{stale}\nfooter\n", encoding="utf-8")
+    monkeypatch.setattr(C, "readme_path", lambda: str(readme))
+    assert C.main(["--emit-readme", "--write"]) == 0
+    assert C.main(["--emit-readme", "--check"]) == 0            # now in sync with the snapshot
+    assert "footer" in readme.read_text(encoding="utf-8")       # content outside the block preserved
 
 
 def test_replace_readme_block_requires_exactly_one():

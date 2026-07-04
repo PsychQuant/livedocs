@@ -23,6 +23,7 @@ reproducible by re-running both MCP tools by hand (procedure in README). Pass
 --verify-live to re-fetch registry ground truth and warn on drift.
 """
 import argparse
+import datetime
 import json
 import os
 import re
@@ -123,21 +124,39 @@ README_END = "<!-- END vs-context7 -->"
 # but stops at the first END (#46 verify — a crafted captured_at can't smuggle an
 # END either; render_readme_block validates the date shape first).
 _SENTINEL_RE = re.compile(re.escape(README_BEGIN) + r".*?" + re.escape(README_END), re.DOTALL)
-# captured_at must be exactly an ISO date — rejects a missing/blank date (which would
-# ship "captured None") AND any value carrying markup/sentinels (injection guard).
-_ISO_DATE_RE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z")
 
 
 def _sole_block(readme_text):
-    """Return the one sentinel-delimited block's text, or raise if there is not
-    EXACTLY one. Exactly-one is the invariant the drift guard rests on: a first-match
-    `re.search` would let a second, stale block slip past `--check` undetected (#46 verify)."""
+    """Return the one sentinel-delimited block's text, or raise unless there is EXACTLY
+    one WELL-FORMED block. Counting only complete BEGIN…END pairs missed an orphaned
+    BEGIN (a stale chart with no END still renders on GitHub yet passed `--check`), so
+    also require the raw BEGIN/END occurrence counts to be 1 (#46 verify round 2)."""
+    begins = readme_text.count(README_BEGIN)
+    ends = readme_text.count(README_END)
     blocks = _SENTINEL_RE.findall(readme_text)
-    if len(blocks) != 1:
+    if not (begins == ends == len(blocks) == 1):
         raise ValueError(
-            f"expected exactly one vs-context7 sentinel block in README, found {len(blocks)}"
+            f"expected exactly one well-formed vs-context7 sentinel block in README "
+            f"(found {begins} BEGIN, {ends} END, {len(blocks)} complete)"
         )
     return blocks[0]
+
+
+def _require_iso_date(value):
+    """Raise unless value is a real ISO calendar date (YYYY-MM-DD, ASCII). The date is
+    the only free-text field reaching the front-page block, so this guards the 'dated'
+    claim: it rejects None / "captured None" / markup-injection AND calendar-impossible
+    dates (2026-99-99) via a `date.fromisoformat` round-trip — which also forbids the
+    Unicode digits a shape-only regex would accept (#46 verify round 2)."""
+    s = value if isinstance(value, str) else ""
+    try:
+        if s != datetime.date.fromisoformat(s).isoformat():
+            raise ValueError
+    except (ValueError, TypeError):
+        raise ValueError(
+            f"captured_at must be a real ISO date (YYYY-MM-DD); got {value!r}. "
+            "Refusing to emit a README competitive claim with a missing/malformed date."
+        )
 
 
 def render_bar_chart(t, captured_at, width=26):
@@ -172,11 +191,7 @@ def render_readme_block(rows, captured_at):
     Refuses to emit unless captured_at is a bare ISO date — a competitive claim on the
     front page must carry a real date, and this also blocks a crafted snapshot from
     injecting markup / a stray END sentinel into the block (#46 verify)."""
-    if not _ISO_DATE_RE.match(str(captured_at) if captured_at is not None else ""):
-        raise ValueError(
-            f"captured_at must be an ISO date (YYYY-MM-DD); got {captured_at!r}. "
-            "Refusing to emit a README competitive claim with a missing/malformed date."
-        )
+    _require_iso_date(captured_at)
     chart = render_bar_chart(tally(rows), captured_at)
     return "\n".join([
         README_BEGIN,
@@ -211,6 +226,10 @@ def _atomic_write(path, text):
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
+        try:   # mkstemp is 0600; preserve the target's mode so README isn't dropped to owner-only
+            os.chmod(tmp, os.stat(path).st_mode & 0o777)
+        except OSError:
+            pass
         os.replace(tmp, path)
     except BaseException:
         try:
@@ -233,10 +252,11 @@ def main(argv=None):
                     help="re-fetch registry ground truth and warn if the recorded snapshot drifted")
     ap.add_argument("--emit-readme", action="store_true",
                     help="emit the README vs-context7 block (bar chart); compose with --write / --check")
-    ap.add_argument("--write", action="store_true",
-                    help="with --emit-readme: rewrite the sentinel-marked block in README.md in place")
-    ap.add_argument("--check", action="store_true",
-                    help="with --emit-readme: exit 1 if README's block drifted from the snapshot (fail-loud guard)")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--write", action="store_true",
+                      help="with --emit-readme: rewrite the sentinel-marked block in README.md in place")
+    mode.add_argument("--check", action="store_true",
+                      help="with --emit-readme: exit 1 if README's block drifted from the snapshot (fail-loud guard)")
     args = ap.parse_args(argv)
 
     # --write / --check are modifiers of --emit-readme; without it they silently
@@ -255,9 +275,9 @@ def main(argv=None):
             with open(path, encoding="utf-8") as f:
                 current = f.read()
             try:
-                committed = _sole_block(current)   # exactly one block, or fail loud
+                committed = _sole_block(current)   # exactly one well-formed block, or fail loud
             except ValueError as exc:
-                print(f"✗ {exc} — run: python3 evals/look-up/compare_context7.py --emit-readme --write",
+                print(f"✗ {exc} — restore the sentinel block by hand, then re-run --emit-readme --write",
                       file=sys.stderr)
                 return 1
             if committed.strip() != block.strip():
@@ -269,7 +289,12 @@ def main(argv=None):
         if args.write:
             with open(path, encoding="utf-8") as f:
                 current = f.read()
-            _atomic_write(path, replace_readme_block(current, block))   # raises unless exactly one block
+            try:
+                new_text = replace_readme_block(current, block)   # raises unless exactly one well-formed block
+            except ValueError as exc:
+                print(f"✗ {exc} — restore the sentinel block by hand, then re-run --write", file=sys.stderr)
+                return 1
+            _atomic_write(path, new_text)
             print(f"✓ wrote vs-context7 block to {path}")
             return 0
         print(block)
