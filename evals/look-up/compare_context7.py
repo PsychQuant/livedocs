@@ -23,10 +23,12 @@ reproducible by re-running both MCP tools by hand (procedure in README). Pass
 --verify-live to re-fetch registry ground truth and warn on drift.
 """
 import argparse
+import datetime
 import json
 import os
 import re
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SAMPLE_PATH = os.path.join(HERE, "compare_context7_sample.json")
@@ -110,6 +112,133 @@ def render_table(rows):
     return "\n".join(lines)
 
 
+# ── vs-context7 README front-page block (issue #46) ───────────────────────────
+# The README block is MACHINE-PRODUCED from the dated snapshot, never hand-edited:
+# a competitive number in prose that drifts becomes an *asserted* claim, which the
+# project iron rule forbids (measured, never asserted — #27/#29). Sentinels delimit
+# the block; `--emit-readme --check` turns drift into a failure.
+README_BEGIN = "<!-- BEGIN vs-context7 (generated: compare_context7.py --emit-readme --write — do not hand-edit) -->"
+README_END = "<!-- END vs-context7 -->"
+# Single sentinel-to-sentinel matcher, reused by every path that reads/writes the
+# block so they can never diverge. Non-greedy + DOTALL: one block spans newlines
+# but stops at the first END (#46 verify — a crafted captured_at can't smuggle an
+# END either; render_readme_block validates the date shape first).
+_SENTINEL_RE = re.compile(re.escape(README_BEGIN) + r".*?" + re.escape(README_END), re.DOTALL)
+
+
+def _sole_block(readme_text):
+    """Return the one sentinel-delimited block's text, or raise unless there is EXACTLY
+    one WELL-FORMED block. Counting only complete BEGIN…END pairs missed an orphaned
+    BEGIN (a stale chart with no END still renders on GitHub yet passed `--check`), so
+    also require the raw BEGIN/END occurrence counts to be 1 (#46 verify round 2)."""
+    begins = readme_text.count(README_BEGIN)
+    ends = readme_text.count(README_END)
+    blocks = _SENTINEL_RE.findall(readme_text)
+    if not (begins == ends == len(blocks) == 1):
+        raise ValueError(
+            f"expected exactly one well-formed vs-context7 sentinel block in README "
+            f"(found {begins} BEGIN, {ends} END, {len(blocks)} complete)"
+        )
+    return blocks[0]
+
+
+def _require_iso_date(value):
+    """Raise unless value is a real ISO calendar date (YYYY-MM-DD, ASCII). The date is
+    the only free-text field reaching the front-page block, so this guards the 'dated'
+    claim: it rejects None / "captured None" / markup-injection AND calendar-impossible
+    dates (2026-99-99) via a `date.fromisoformat` round-trip — which also forbids the
+    Unicode digits a shape-only regex would accept (#46 verify round 2)."""
+    s = value if isinstance(value, str) else ""
+    try:
+        if s != datetime.date.fromisoformat(s).isoformat():
+            raise ValueError
+    except (ValueError, TypeError):
+        raise ValueError(
+            f"captured_at must be a real ISO date (YYYY-MM-DD); got {value!r}. "
+            "Refusing to emit a README competitive claim with a missing/malformed date."
+        )
+
+
+def render_bar_chart(t, captured_at, width=26):
+    """Unicode bar chart of latest-version freshness over the *contested* set.
+
+    Pure: takes the tally() dict (n / livedocs_current / context7_current) + a
+    capture date, returns a plain-text block. Bar length is proportional to
+    count/n, so the visual can never contradict the number it labels. The honesty
+    caveat is part of the returned block — it cannot be separated from the chart.
+    """
+    n = t["n"]
+
+    def bar(count):
+        filled = round(width * count / n) if n else 0
+        filled = max(0, min(filled, width))   # defensive: a malformed tally can't overflow the bar
+        return "█" * filled + "░" * (width - filled)
+
+    lo, c7 = t["livedocs_current"], t["context7_current"]
+    return "\n".join([
+        f"latest-version freshness · contested set ({n} fast-moving libs) · captured {captured_at}",
+        f"  LiveDocs  {bar(lo)}  {lo}/{n}",
+        f"  context7  {bar(c7)}  {c7}/{n}",
+        "  freshness only · context7 wins coverage · LiveDocs current by construction · measured, not asserted",
+    ])
+
+
+def render_readme_block(rows, captured_at):
+    """The full sentinel-delimited README section: the bar chart in a fenced code
+    block + a one-line pointer to the harness. Reuses tally() so the chart and the
+    CLI summary can never disagree.
+
+    Refuses to emit unless captured_at is a bare ISO date — a competitive claim on the
+    front page must carry a real date, and this also blocks a crafted snapshot from
+    injecting markup / a stray END sentinel into the block (#46 verify)."""
+    _require_iso_date(captured_at)
+    chart = render_bar_chart(tally(rows), captured_at)
+    return "\n".join([
+        README_BEGIN,
+        "```text",
+        chart,
+        "```",
+        "_Measured by `evals/look-up/compare_context7.py` from a dated snapshot — "
+        "freshness only, on deliberately fast-moving libs; context7 wins on coverage. "
+        "Regenerate: `python3 evals/look-up/compare_context7.py --emit-readme --write`._",
+        README_END,
+    ])
+
+
+def readme_path():
+    """Absolute path to the repo-root README (two levels up from this file)."""
+    return os.path.abspath(os.path.join(HERE, "..", "..", "README.md"))
+
+
+def replace_readme_block(readme_text, new_block):
+    """Return readme_text with its (single) sentinel-delimited vs-context7 block
+    replaced. Raises ValueError unless EXACTLY one block is present — never silently
+    appends, never leaves a second stale block behind (#46 verify)."""
+    _sole_block(readme_text)   # assert exactly one; raises otherwise
+    # lambda replacement avoids re interpreting backslashes / group refs in new_block
+    return _SENTINEL_RE.sub(lambda _m: new_block, readme_text, count=1)
+
+
+def _atomic_write(path, text):
+    """Write text to path via a temp file + os.replace so an interrupted write never
+    leaves README.md truncated (#46 verify)."""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        try:   # mkstemp is 0600; preserve the target's mode so README isn't dropped to owner-only
+            os.chmod(tmp, os.stat(path).st_mode & 0o777)
+        except OSError:
+            pass
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def load_sample(path=SAMPLE_PATH):
     with open(path, encoding="utf-8") as f:
         return json.load(f)
@@ -121,11 +250,55 @@ def main(argv=None):
     ap.add_argument("--json", action="store_true", help="emit the result summary as JSON")
     ap.add_argument("--verify-live", action="store_true",
                     help="re-fetch registry ground truth and warn if the recorded snapshot drifted")
+    ap.add_argument("--emit-readme", action="store_true",
+                    help="emit the README vs-context7 block (bar chart); compose with --write / --check")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--write", action="store_true",
+                      help="with --emit-readme: rewrite the sentinel-marked block in README.md in place")
+    mode.add_argument("--check", action="store_true",
+                      help="with --emit-readme: exit 1 if README's block drifted from the snapshot (fail-loud guard)")
     args = ap.parse_args(argv)
+
+    # --write / --check are modifiers of --emit-readme; without it they silently
+    # no-op'd and a mis-invoked `--check` guard exited 0 (false pass, #46 verify).
+    if (args.check or args.write) and not args.emit_readme:
+        ap.error("--check / --write require --emit-readme")
 
     sample = load_sample(args.sample)
     results = sample.get("results", [])
     rows = [judge_row(e) for e in results]
+
+    if args.emit_readme:
+        block = render_readme_block(rows, sample.get("captured_at"))
+        path = readme_path()
+        if args.check:
+            with open(path, encoding="utf-8") as f:
+                current = f.read()
+            try:
+                committed = _sole_block(current)   # exactly one well-formed block, or fail loud
+            except ValueError as exc:
+                print(f"✗ {exc} — restore the sentinel block by hand, then re-run --emit-readme --write",
+                      file=sys.stderr)
+                return 1
+            if committed.strip() != block.strip():
+                print("✗ README vs-context7 block is stale — run: "
+                      "python3 evals/look-up/compare_context7.py --emit-readme --write", file=sys.stderr)
+                return 1
+            print("✓ README vs-context7 block in sync")
+            return 0
+        if args.write:
+            with open(path, encoding="utf-8") as f:
+                current = f.read()
+            try:
+                new_text = replace_readme_block(current, block)   # raises unless exactly one well-formed block
+            except ValueError as exc:
+                print(f"✗ {exc} — restore the sentinel block by hand, then re-run --write", file=sys.stderr)
+                return 1
+            _atomic_write(path, new_text)
+            print(f"✓ wrote vs-context7 block to {path}")
+            return 0
+        print(block)
+        return 0
 
     if args.verify_live:
         from oracle import fetch_latest_version

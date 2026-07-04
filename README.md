@@ -1,5 +1,15 @@
 # LiveDocs
 
+<!-- BEGIN vs-context7 (generated: compare_context7.py --emit-readme --write — do not hand-edit) -->
+```text
+latest-version freshness · contested set (6 fast-moving libs) · captured 2026-07-02
+  LiveDocs  ██████████████████████████  6/6
+  context7  ░░░░░░░░░░░░░░░░░░░░░░░░░░  0/6
+  freshness only · context7 wins coverage · LiveDocs current by construction · measured, not asserted
+```
+_Measured by `evals/look-up/compare_context7.py` from a dated snapshot — freshness only, on deliberately fast-moving libs; context7 wins on coverage. Regenerate: `python3 evals/look-up/compare_context7.py --emit-readme --write`._
+<!-- END vs-context7 -->
+
 A **Claude Code plugin** for primary-source-first, always-latest documentation.
 
 context7 is a pre-built, periodically-recrawled, lossy vector index. LiveDocs instead
@@ -98,7 +108,7 @@ than hardcoding a fact), and it's statistical (N runs, rate thresholds).
 
 ```bash
 pip install -r evals/look-up/requirements.txt
-python3 -m pytest evals/look-up/tests/     # 50 harness unit tests (no API calls)
+python3 -m pytest evals/look-up/tests/     # 60 harness unit tests (no API calls)
 python3 evals/look-up/run_eval.py --dry-run
 python3 evals/look-up/run_eval.py --runs 5 # live baseline (real `claude -p` calls)
 ```
@@ -113,7 +123,7 @@ python3 evals/look-up/compare_context7.py --verify-live  # warn if the snapshot 
 
 See [`evals/look-up/README.md`](evals/look-up/README.md) for the design of both, and
 the [Testing wiki page](https://github.com/PsychQuant/livedocs/wiki/Testing) for the full
-suite breakdown (194 tests: 144 Swift + 50 Python).
+suite breakdown (204 tests: 144 Swift + 60 Python).
 
 Status: shipped (v0.8.0; engine features below shipped v0.7.0, the skill's `look-up` rename +
 explicit invocation landed in v0.8.0). 9-ecosystem registry resolution, version pinning (npm/pypi/crates/go/rubygems), OpenAPI/GraphQL/CLI +
