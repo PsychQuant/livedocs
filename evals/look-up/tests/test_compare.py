@@ -115,6 +115,51 @@ def test_render_table_has_header_and_rows():
     assert md.count("\n") >= 2                        # header + separator + >=1 row
 
 
+def test_render_bar_chart_structural():
+    # Issue #46: the README top block is a Unicode bar chart of the *same* tally()
+    # contested-set counts. Assert structure, not golden bar art: both tools labeled,
+    # the N/M numbers match the tally, the honesty caveat travels with the chart, and
+    # a higher count means a more-filled bar (so the visual can't invert the number).
+    from compare_context7 import render_bar_chart  # in-function: clean RED before it exists
+    t = {"n": 6, "livedocs_current": 6, "context7_current": 0}
+    chart = render_bar_chart(t, "2026-07-02")
+    assert "LiveDocs" in chart and "context7" in chart
+    assert "6/6" in chart and "0/6" in chart           # counts match the tally
+    assert "2026-07-02" in chart                        # dated capture is visible
+    assert "measured, not asserted" in chart            # load-bearing honesty caveat inline
+    livedocs_line = next(l for l in chart.splitlines() if "LiveDocs" in l)
+    context7_line = next(l for l in chart.splitlines() if "context7" in l)
+    # bar length ∝ count/n → LiveDocs (6/6) more filled than context7 (0/6)
+    assert livedocs_line.count("█") > context7_line.count("█")
+
+
+def test_render_bar_chart_zero_n_no_crash():
+    # Empty contested set must not ZeroDivisionError.
+    from compare_context7 import render_bar_chart
+    chart = render_bar_chart({"n": 0, "livedocs_current": 0, "context7_current": 0}, "2026-07-02")
+    assert "0/0" in chart
+
+
+def test_emit_readme_block_matches_committed_readme():
+    # Issue #46 drift guard: the README vs-context7 block MUST be byte-identical to what
+    # the harness emits from the dated snapshot. Makes a hand-edited / stale competitive
+    # number a RED suite (the project iron rule: measured, never asserted — #27/#29).
+    import re
+    from compare_context7 import render_readme_block, load_sample, judge_row, README_BEGIN, README_END
+    sample = load_sample()
+    rows = [judge_row(e) for e in sample.get("results", [])]
+    emitted = render_readme_block(rows, sample.get("captured_at"))
+    readme_path = os.path.abspath(os.path.join(EVAL_DIR, "..", "..", "README.md"))
+    with open(readme_path, encoding="utf-8") as f:
+        readme = f.read()
+    m = re.search(re.escape(README_BEGIN) + r".*?" + re.escape(README_END), readme, re.DOTALL)
+    assert m, "README is missing the vs-context7 sentinel block"
+    assert m.group(0).strip() == emitted.strip(), (
+        "README vs-context7 block is stale — run: "
+        "python3 evals/look-up/compare_context7.py --emit-readme --write"
+    )
+
+
 def test_sample_covers_corpus():
     # compare_corpus.yaml is the canonical library list; the recorded sample must
     # cover every one of them (so adding a lib to the corpus without recording its
