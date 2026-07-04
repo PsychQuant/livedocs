@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.9.0]
 
 - **Explicit ecosystem hint syntax** for `look-up` — a `<ecosystem>:<name>` prefix (`npm:go`, `cran:dplyr`, `crates:serde@1.0.100`) forces a specific ecosystem, as an escape hatch for (1) package names shadowed by the fixed language set (`go`/`swift`/`r`/…, which otherwise route to runtime introspection) and (2) named-only registries (cran/crates/maven/…) that previously relied on the agent inferring the ecosystem. Classification precedence is URL → **ecosystem-hint** → Language → Package; splitting once at the first `:`, a hint is recognized only when the prefix (case-insensitively) is one of the nine known ecosystem ids, the remainder is non-empty, and the remainder's first character is not `/` (so a bare `npm:` and a URL scheme's `npm://x` are both NOT hints and fall through). Version pins compose (`crates:serde@1.0.100`). This is a plugin-shell (skill contract) change — the MCP binary is unchanged. The published `explicit-doc-lookup` spec's pin scenario is also reconciled with the crates/go/rubygems pin-honoring behavior shipped earlier.
 
