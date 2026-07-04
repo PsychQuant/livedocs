@@ -2,13 +2,13 @@
 
 # 測試
 
-LiveDocs 有兩套獨立 test suite —— **197 個 test,全綠**。Swift suite 驗證引擎;Python suite
+LiveDocs 有兩套獨立 test suite —— **202 個 test,全綠**。Swift suite 驗證引擎;Python suite
 驗證 `look-up` *skill* 是否真的會激起 LiveDocs 查詢並給出現行答案, 外加 vs-context7 比較
 harness。以下計數是快照;真正的 source of truth 是實際跑一次。
 
 ```bash
 swift test                                  # 144 個 Swift test
-python3 -m pytest evals/look-up/tests/  # 53 個 Python eval test
+python3 -m pytest evals/look-up/tests/  # 58 個 Python eval test
 ```
 
 ## Swift — 144 個 test（`swift test`）
@@ -43,7 +43,7 @@ python3 -m pytest evals/look-up/tests/  # 53 個 Python eval test
 | `ProcessRunnerTests` | 4 | 大輸出不 deadlock(並發讀 pipe)、exit code 浮現、timeout 回報、SIGTERM→SIGKILL escalation。 |
 | `LatestVersionEncodingTests` | 14 | `latest_version` 工具邊界:pin_honored true/false/nil surfacing(含 nothing-resolved 路徑的 false、無 pin 時缺席)、Go `v`-prefix 已確認 pin(不可誤判成 not-applied)、v-prefix 輸入建出正確 confirm URL、npm 找不到→latest+false、npm dist-tag/exact-pin 區分(移動 tag 絕不假裝成 pin)、RubyGems 端到端 pin(honored + not-found)。 |
 
-## Python — 53 個 test（`pytest evals/look-up/`）
+## Python — 58 個 test（`pytest evals/look-up/`）
 
 `look-up` **skill eval harness** —— 不是測 Swift 引擎,而是測 skill 對多種 prompt 會不會
 激起 LiveDocs 查詢並答對現行 —— 外加 vs-context7 比較 harness。見
@@ -52,7 +52,7 @@ python3 -m pytest evals/look-up/tests/  # 53 個 Python eval test
 | 檔案 | 數 | 測什麼 |
 |------|---:|--------|
 | `test_run_eval.py` | 17 | rate 門檻判定、N=3 門檻塌縮 guard、failed-run / inconclusive 處理、explicit route 比對、`args_match`——對的工具但錯的參數(mis-split `name@version` / 掉 ecosystem pin)判為不正確。 |
-| `test_compare.py` | 15 | vs-context7 新鮮度 harness:版本 token 比對(邊界形式)、對稱計分、表格＋長條圖 render、README emit-block 漂移守衛、corpus↔sample 同步。 |
+| `test_compare.py` | 20 | vs-context7 新鮮度 harness:版本 token 比對(邊界形式)、對稱計分、表格＋長條圖 render、README emit-block 漂移守衛(唯一區塊斷言、captured_at 驗證、`main()` CLI exit code)、corpus↔sample 同步。 |
 | `test_oracle.py` | 8 | `self_check`(eval 時打 registry —— 防腐爛)/ `structural` / `golden` oracle。 |
 | `test_detect.py` | 9 | `claude -p` stream-json 解析、`is_error` 偵測、LiveDocs 觸發訊號辨識、逐 call 工具輸入捕捉(short name + input args)。 |
 | `test_corpus.py` | 4 | corpus 覆蓋守衛(存在一個 golden case + 一個 library-named 對抗負面案例 + explicit /livedocs:look-up 各 argument shape 都有代表案例 + arg-sensitive 案例 pin 住 `expected_args`)。 |
