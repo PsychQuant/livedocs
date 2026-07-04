@@ -115,4 +115,42 @@ final class RegistryAdaptersTests: XCTestCase {
         XCTAssertThrowsError(try parsePackagist(Data(#"{"packages":{}}"#.utf8)))
         XCTAssertThrowsError(try parseMavenSearch(Data(#"{"response":{"docs":[]}}"#.utf8)))
     }
+
+    // MARK: - Per-version confirm parsers (issue #36)
+    // These read the FIRST-CLASS per-version endpoint of each ecosystem to
+    // CONFIRM a pinned version exists. They return just the version string
+    // (nil = malformed / not confirmable) — repo/docs stay latest-level.
+
+    func testCratesVersionConfirm() {
+        // crates.io — https://crates.io/api/v1/crates/serde/1.0.100
+        let json = #"{"version":{"crate":"serde","num":"1.0.100","yanked":false}}"#.data(using: .utf8)!
+        XCTAssertEqual(parseCratesVersion(json), "1.0.100")
+        XCTAssertNil(parseCratesVersion(Data("{}".utf8)))           // no version object
+        XCTAssertNil(parseCratesVersion(Data(#"{"version":{}}"#.utf8)))  // no num
+    }
+
+    func testGoVersionInfoConfirm() {
+        // Go proxy — https://proxy.golang.org/<mod>/@v/v1.9.1.info
+        let json = #"{"Version":"v1.9.1","Time":"2021-06-24T18:20:00Z"}"#.data(using: .utf8)!
+        XCTAssertEqual(parseGoVersionInfo(json), "v1.9.1")          // keeps the v-prefix (Go convention)
+        XCTAssertNil(parseGoVersionInfo(Data("{}".utf8)))
+    }
+
+    func testRubyGemsVersionConfirm() {
+        // RubyGems v2 — https://rubygems.org/api/v2/rubygems/rails/versions/8.1.3.json
+        let json = #"{"name":"rails","number":"8.1.3","platform":"ruby"}"#.data(using: .utf8)!
+        XCTAssertEqual(parseRubyGemsVersion(json), "8.1.3")
+        XCTAssertNil(parseRubyGemsVersion(Data("{}".utf8)))
+    }
+
+    func testSupportsVersionPinCoverage() {
+        // #36: crates/go/rubygems gain first-class per-version pin support.
+        for e in [Ecosystem.npm, .pypi, .crates, .go, .rubygems] {
+            XCTAssertTrue(e.supportsVersionPin, "\(e) should support version pin")
+        }
+        // The rest remain latest-only (endpoints too indirect this round).
+        for e in [Ecosystem.jsr, .packagist, .maven, .cran] {
+            XCTAssertFalse(e.supportsVersionPin, "\(e) must stay latest-only")
+        }
+    }
 }
