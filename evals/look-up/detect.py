@@ -2,7 +2,8 @@
 
 Two halves:
   - parse_stream(text)   PURE  — turn a `claude -p --output-format stream-json`
-                                 transcript into (triggered, tools_fired, final_text, ok).
+                                 transcript into
+                                 (triggered, tools_fired, final_text, ok, tool_calls).
   - run_prompt(prompt)   IMPURE — shell out to `claude -p` and feed its stream to
                                  parse_stream.
 
@@ -27,10 +28,18 @@ from typing import List, Tuple
 LIVEDOCS_PREFIX = "mcp__plugin_livedocs_livedocs__"
 
 
-def parse_stream(text: str) -> Tuple[bool, List[str], str, bool]:
-    """Parse newline-delimited stream-json into (triggered, tools_fired, final_text, ok).
+def parse_stream(text: str) -> Tuple[bool, List[str], str, bool, List[dict]]:
+    """Parse newline-delimited stream-json into
+    (triggered, tools_fired, final_text, ok, tool_calls).
 
     - tools_fired: LiveDocs tool names in call order.
+    - tool_calls: one dict per LiveDocs tool_use, in call order, as
+      ``{"name": <short-name>, "input": <input-dict>}`` where <short-name> is
+      the trailing segment (``resolve_source``, not the fully-qualified MCP
+      name). This exposes the ACTUAL arguments the skill passed (library,
+      ecosystem, version, target), so a route that fires the right tool with the
+      WRONG args — a mis-split ``name@version`` or a dropped ecosystem pin —
+      can be caught, which a name-only route check cannot (issue #38 verify).
     - final_text: the `result` line if non-empty, else the last assistant text
       block (an empty `result` no longer clobbers a real answer).
     - ok: False if any `result` line has `is_error: true` — an errored run that
@@ -38,6 +47,7 @@ def parse_stream(text: str) -> Tuple[bool, List[str], str, bool]:
     - Malformed / non-JSON lines are skipped, never fatal.
     """
     tools_fired: List[str] = []
+    tool_calls: List[dict] = []
     last_assistant_text = ""
     result_text = None
     is_error = False
@@ -63,6 +73,11 @@ def parse_stream(text: str) -> Tuple[bool, List[str], str, bool]:
                     name = block.get("name", "")
                     if isinstance(name, str) and name.startswith(LIVEDOCS_PREFIX):
                         tools_fired.append(name)
+                        inp = block.get("input")
+                        tool_calls.append({
+                            "name": name.rsplit("__", 1)[-1],
+                            "input": inp if isinstance(inp, dict) else {},
+                        })
                 elif block.get("type") == "text":
                     txt = block.get("text")
                     if isinstance(txt, str) and txt.strip():
@@ -78,12 +93,13 @@ def parse_stream(text: str) -> Tuple[bool, List[str], str, bool]:
     final_text = result_text if result_text else last_assistant_text
     triggered = len(tools_fired) > 0
     ok = not is_error
-    return triggered, tools_fired, final_text, ok
+    return triggered, tools_fired, final_text, ok, tool_calls
 
 
 def run_prompt(prompt: str, cwd: str | None = None, timeout: int = 180,
-               extra_args: List[str] | None = None) -> Tuple[bool, List[str], str, bool]:
-    """Run one prompt headlessly and return (triggered, tools_fired, final_text, ok).
+               extra_args: List[str] | None = None) -> Tuple[bool, List[str], str, bool, List[dict]]:
+    """Run one prompt headlessly and return
+    (triggered, tools_fired, final_text, ok, tool_calls).
 
     The prompt is fed via **stdin** (not an argv slot) so a prompt beginning with
     `-` can never be parsed as a CLI flag. `ok` is False on a non-zero exit, a
@@ -105,10 +121,10 @@ def run_prompt(prompt: str, cwd: str | None = None, timeout: int = 180,
             cmd, cwd=cwd, input=prompt, capture_output=True, text=True, timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        return False, [], "__timeout__", False
+        return False, [], "__timeout__", False, []
     except FileNotFoundError:
         raise RuntimeError("`claude` CLI not found on PATH — install Claude Code to run the live eval")
 
-    triggered, tools, final, parse_ok = parse_stream(proc.stdout)
+    triggered, tools, final, parse_ok, tool_calls = parse_stream(proc.stdout)
     ok = parse_ok and proc.returncode == 0
-    return triggered, tools, final, ok
+    return triggered, tools, final, ok, tool_calls

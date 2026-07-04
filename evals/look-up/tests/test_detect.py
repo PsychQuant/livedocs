@@ -1,7 +1,7 @@
 """TDD for detect.parse_stream — the pure half of trigger detection.
 
 parse_stream turns a `claude -p --output-format stream-json` transcript into
-(triggered, tools_fired, final_text, ok). It must recognise a LiveDocs MCP
+(triggered, tools_fired, final_text, ok, tool_calls). It must recognise a LiveDocs MCP
 tool_use (name prefixed `mcp__plugin_livedocs_livedocs__`) as a trigger, ignore
 unrelated tools, recover the final answer, and flag `is_error` runs as not-ok.
 """
@@ -45,7 +45,7 @@ NEGATIVE_STREAM = "\n".join([
 
 
 def test_positive_stream_triggers_and_captures_tool_and_text():
-    triggered, tools, final, ok = parse_stream(POSITIVE_STREAM)
+    triggered, tools, final, ok, _calls = parse_stream(POSITIVE_STREAM)
     assert triggered is True
     assert tools == [LIVEDOCS_PREFIX + "latest_version"]
     assert "1.40.0" in final
@@ -53,7 +53,7 @@ def test_positive_stream_triggers_and_captures_tool_and_text():
 
 
 def test_negative_stream_does_not_trigger_and_ignores_non_livedocs_tool():
-    triggered, tools, final, ok = parse_stream(NEGATIVE_STREAM)
+    triggered, tools, final, ok, _calls = parse_stream(NEGATIVE_STREAM)
     assert triggered is False
     assert tools == []
     assert "hash map" in final
@@ -68,14 +68,14 @@ def test_multiple_livedocs_tools_all_captured_in_order():
             {"type": "tool_use", "id": "b", "name": LIVEDOCS_PREFIX + "fetch_docs", "input": {}}]}}),
         _line({"type": "result", "result": "done"}),
     ])
-    triggered, tools, final, ok = parse_stream(stream)
+    triggered, tools, final, ok, _calls = parse_stream(stream)
     assert triggered is True
     assert tools == [LIVEDOCS_PREFIX + "resolve_source", LIVEDOCS_PREFIX + "fetch_docs"]
 
 
 def test_malformed_lines_are_skipped_not_fatal():
     stream = "not json\n" + _line({"type": "result", "result": "ok"}) + "\n\n{bad json"
-    triggered, tools, final, ok = parse_stream(stream)
+    triggered, tools, final, ok, _calls = parse_stream(stream)
     assert triggered is False
     assert tools == []
     assert final == "ok"
@@ -86,7 +86,7 @@ def test_final_text_falls_back_to_last_assistant_text_without_result_line():
         _line({"type": "assistant", "message": {"content": [{"type": "text", "text": "first"}]}}),
         _line({"type": "assistant", "message": {"content": [{"type": "text", "text": "second"}]}}),
     ])
-    _, _, final, _ = parse_stream(stream)
+    _, _, final, _, _ = parse_stream(stream)
     assert final == "second"
 
 
@@ -96,7 +96,7 @@ def test_empty_result_string_does_not_clobber_assistant_text():
         _line({"type": "assistant", "message": {"content": [{"type": "text", "text": "real answer 1.2.3"}]}}),
         _line({"type": "result", "result": ""}),
     ])
-    _, _, final, _ = parse_stream(stream)
+    _, _, final, _, _ = parse_stream(stream)
     assert final == "real answer 1.2.3"
 
 
@@ -108,6 +108,27 @@ def test_is_error_result_marks_run_not_ok():
             {"type": "tool_use", "id": "t1", "name": LIVEDOCS_PREFIX + "resolve_source", "input": {}}]}}),
         _line({"type": "result", "is_error": True, "result": "API Error: 529 Overloaded"}),
     ])
-    triggered, tools, final, ok = parse_stream(stream)
+    triggered, tools, final, ok, _calls = parse_stream(stream)
     assert triggered is True          # a tool did fire
     assert ok is False                # but the run errored → not a valid answer
+
+
+def test_tool_calls_capture_short_name_and_input_args():
+    # issue #38 verify: the harness must see the ACTUAL args a tool was called
+    # with (short name + input dict), not just which tool fired.
+    _, _, _, _, calls = parse_stream(POSITIVE_STREAM)
+    assert calls == [{"name": "latest_version",
+                      "input": {"library": "tokio", "ecosystem": "crates"}}]
+
+
+def test_tool_calls_default_empty_input_and_skip_non_livedocs():
+    stream = "\n".join([
+        _line({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "r1", "name": "Read", "input": {"file_path": "/x"}}]}}),
+        _line({"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "id": "a", "name": LIVEDOCS_PREFIX + "resolve_source"}]}}),  # no input key
+        _line({"type": "result", "result": "done"}),
+    ])
+    _, _, _, _, calls = parse_stream(stream)
+    # non-LiveDocs Read is excluded; missing input defaults to {}.
+    assert calls == [{"name": "resolve_source", "input": {}}]
