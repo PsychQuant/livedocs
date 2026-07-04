@@ -36,13 +36,13 @@ context7 是以覆蓋率排序、週期性重爬的索引; LiveDocs 直接抓 li
 | `resolve_source` | 某 library 的 ranked primary sources(fidelity 優先)。 |
 | `fetch_docs` | 某 source URL 的逐字 raw 內容。 |
 | `latest_version` | 從 registry 拿最新版 + changelog/repo(9 生態:npm/pypi/crates/go/rubygems/jsr/packagist/maven/cran), 支援版本 pin。 |
-| `introspect` | OpenAPI / GraphQL schema、已裝 CLI 的 `--help`、已裝 R 套件的版本(`kind:"r-pkg"`)、或專案的有效語言 runtime 版本(`kind:"runtime"`, Python/Node/Go/Rust/Java/.NET/Swift)。Read-only。 |
+| `introspect` | OpenAPI / GraphQL schema、已裝 CLI 的 `--help`、已裝 R 套件的版本(`kind:"r-pkg"`)、或專案的有效語言 runtime 版本(`kind:"runtime"`, Python/Node/Go/Rust/Java/.NET/Swift/R；`javascript` alias 到 node)。Read-only。 |
 
 ## 說明頁
 
 - [版本協調流程](Version-Reconciliation-zh-TW): 自動偵測更新流程。
 - [Primary-Source 光譜](Primary-Source-Spectrum-zh-TW): LiveDocs 是什麼、不是什麼。
-- [測試](Testing-zh-TW): 測試套件（160 個 test）與各自覆蓋範圍。
+- [測試](Testing-zh-TW): 測試套件（194 個 test）與各自覆蓋範圍。
 
 ## 其他
 

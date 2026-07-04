@@ -49,7 +49,8 @@ upgrade prompt. A bare conceptual question with no consuming project → skip th
 1. installed **package**: `introspect{kind:"r-pkg", target:"<pkg>"}` (R; npm/pip to come) —
    `resolved_env` says which library answered.
 2. installed **CLI**: `introspect{kind:"cli", target:"<cmd>"}`.
-3. **language runtime** (Python / Node / Go / Rust / Java / .NET / Swift):
+3. **language runtime** (Python / Node / Go / Rust / Java / .NET / Swift / R;
+   `javascript` aliases to node):
    `introspect{kind:"runtime", target:"<language>" or "auto"}` → the *effective* runtime version.
    Active toolchain is authoritative; declared pins (`.python-version`, `go.mod` `go`,
    `swift-tools-version`, …) only cross-check; a bare constraint or a language-mode declaration
@@ -87,7 +88,7 @@ never installs).
    | The question is about… | Call |
    |---|---|
    | "what's the latest version / did X change / what's new" | `latest_version` (exact version + changelog URL) |
-   | a **specific version** (e.g. React 18 vs 19) | any of the below + `version:"18.3.1"` (honored for npm/pypi registry+repo; llms.txt is always latest and gets labeled) |
+   | a **specific version** (e.g. React 18 vs 19) | any of the below + `version:"18.3.1"` (honored for npm/pypi/crates/go/rubygems — see `latest_version`'s `pin_honored`; llms.txt/repo URLs are always latest and get labeled) |
    | how to use / configure / general docs | `resolve_source` → then `fetch_docs` on the top result |
    | exact API surface — endpoints, request/response shape | `introspect` (kind=openapi or graphql) |
    | a CLI's flags / subcommands / installed version | `introspect` (kind=cli, target = bare command) |
@@ -112,10 +113,11 @@ never installs).
 The user can invoke this skill directly: `/livedocs:look-up <target> [topic...]`.
 Invocation arguments (empty when the skill fired implicitly): $ARGUMENTS
 
-Classify the **first** argument token into exactly one of three shapes — **URL**,
-**Language**, **Package** — in this precedence order (CLI introspection is a
-resolution-time fallback inside the Package shape, not a fourth classification);
-any remaining tokens are a **topic filter** applied when reading the fetched docs:
+Classify the **first** argument token into exactly one of four shapes — **URL**,
+**ecosystem-hint**, **Language**, **Package** — in this precedence order (CLI
+introspection is a resolution-time fallback inside the Package shape, not a
+separate classification); any remaining tokens are a **topic filter** applied
+when reading the fetched docs:
 
 1. **URL** — token starts with `http://` or `https://` (scheme match is
    case-insensitive). Default route: `resolve_source{docs_url}` → `fetch_docs`.
@@ -126,29 +128,66 @@ any remaining tokens are a **topic filter** applied when reading the fetched doc
    `{"sources":[]}` (`/graphql` paths → graphql, everything else → openapi; if
    that introspection fails to validate, report that no docs source was found —
    never claim the URL is an API schema).
-2. **Language** — token matches (case-insensitively) one of: r, python, node,
-   javascript, go, rust, java, dotnet, swift. Normalize `javascript` → `node`
-   before introspecting. Route to `introspect{kind:"runtime", target:<language>}`
-   and anchor language/stdlib answers to the effective local version per
-   **Version reconciliation** above. When the runtime comes back **not resolved**
-   (no version source in the project, or a language the engine has no runtime
-   adapter for — today it probes Python/Node/Go/Rust/Java/.NET/Swift; R has no
-   runtime adapter), say so explicitly and answer from web-latest language docs.
-   Never present a guessed version as the local one. A first token exactly equal
-   to a language name always routes as Language — to look up a package that
-   shares a language name, use its docs URL or ask in prose so the implicit
-   decision flow (with an explicit ecosystem) handles it.
-3. **Package** — any other token, optionally version-pinned as `name@version`.
+2. **Ecosystem hint** — split the token **once at the first `:`** into a prefix
+   and a remainder; it is a hint only when **all** hold: (a) the prefix matches
+   (**case-insensitively**) one of the known ecosystem ids (`npm`, `pypi`,
+   `crates`, `go`, `rubygems`, `jsr`, `packagist`, `maven`, `cran`); (b) the
+   remainder is **non-empty**; (c) the remainder's first character is **not** `/`.
+   (c) separates a hint from a URL scheme (`npm://x`'s `:` is followed by `//`);
+   (b) means a bare `npm:` / `cran:` is **not** a hint; a non-ecosystem prefix
+   (`foo:bar`, `C:\path`) is **not** a hint. In every not-a-hint case pass the
+   **whole** token (colon included) through to Language then Package. When it IS a
+   hint, lowercase the prefix as the named ecosystem and resolve the remainder as
+   a **Package** in that ecosystem, applying rule 4's `name@version` parsing to the
+   remainder **only**. The remainder is otherwise the package identifier
+   **verbatim**, never re-checked as a URL/hint/Language, and the **rule-4 CLI
+   fallback does NOT apply** — a hint committed to a package ecosystem, so
+   `npm:make` resolves the npm package `make`, never the CLI. A remainder with
+   colons (a Maven coordinate `maven:com.google.guava:guava`) stays intact; the
+   only pin form on a hinted remainder is `@version` (`maven:g:a@1.0`), so a native
+   `maven:group:artifact:version` colon-version is part of the coordinate, not a
+   pin. This is the explicit
+   **escape hatch**: it *overrides* Language-set shadowing (`npm:go` → the npm
+   package `go`, **not** the Go runtime) and names the ecosystem for named-only
+   registries (`cran:dplyr`). The hint selects a package ecosystem only; it never
+   routes to a URL, a CLI, or a runtime.
+3. **Language** — token matches (case-insensitively) one of: r, python, node,
+   javascript, go, rust, java, dotnet, swift. The engine treats `javascript` as
+   an alias of `node` — pass the requested identifier through; the resolution
+   source discloses the node probe. Route to `introspect{kind:"runtime",
+   target:<language>}` and anchor language/stdlib answers to the effective local
+   version per **Version reconciliation** above. When the runtime comes back
+   **not resolved** (no version source in the project, or a language the engine
+   has no runtime adapter for — today it probes
+   Python/Node/Go/Rust/Java/.NET/Swift/R), say so explicitly and answer from
+   web-latest language docs.
+   Never present a guessed version as the local one. A bare first token equal to a
+   language name always routes as Language — to look up a **package** that shares
+   a language name, prefix it with the ecosystem hint (rule 2): `npm:go`,
+   `cran:r`, `crates:swift`.
+4. **Package** — any other token, optionally version-pinned as `name@version`.
    An `@` counts as a version separator only when it is not the first character
-   and the suffix after it is non-empty — a leading `@` is part of the name
-   (`@types/node` has no pin; `@scope/pkg@1.2.3` pins 1.2.3; `react@` with an
-   empty suffix means no pin). Route:
+   and the suffix after the **LAST** `@` is non-empty — a leading `@` is part of
+   the name (`@types/node` has no pin; `@scope/pkg@1.2.3` pins 1.2.3;
+   `foo@bar@baz` → name `foo@bar`, version `baz`; `react@` with an empty suffix
+   means no pin and the trailing `@` is stripped → library `react`). Route:
    `resolve_source{library, ecosystem, version?}` → `fetch_docs` on the top
    result. Identifying the ecosystem is **your** fuzzy step per **Decision flow**
    step 1: npm/pypi auto-detect, every other ecosystem must be named by you in
-   the call (e.g. `dplyr` → `ecosystem:"cran"`). Version pins are honored by the
-   npm/pypi registry legs only; for other ecosystems the registry serves latest —
-   state that the pin was not applied.
+   the call (e.g. `dplyr` → `ecosystem:"cran"`). The **ecosystem hint** (rule 2)
+   is the user-facing form of naming it — when the user writes `cran:dplyr` the
+   ecosystem is already chosen for you. Version pins are honored by the
+   npm/pypi/crates/go/rubygems registry legs (each confirmed at its per-version
+   endpoint); jsr/packagist/maven/cran serve latest only. `latest_version`
+   returns `pin_honored` (true = the pin was confirmed and `version` is exactly
+   the pin; false = latest-only ecosystem, version not found, or a non-exact
+   token such as an npm dist-tag / partial version). On `false`, `version` is the
+   registry's current resolution — which may be the latest OR the concrete
+   version a tag/partial resolved to (e.g. a prerelease), so don't present a
+   `pin_honored:false` version as the latest stable. Trust that boolean rather
+   than guessing, and say when a pin was not applied. Either way the docs/repo
+   URLs remain latest (default-branch), so llms/repo sources stay labeled
+   not-pinned even for a honored registry pin.
    **CLI fallback**: package resolution returned `{"sources":[]}` AND the token
    names an installed command → `introspect{kind:"cli", target:<token>}`.
 
@@ -161,12 +200,22 @@ classifier on every outbound fetch; CLI command-name shape validation, a
 `--help`/`--version` flag allowlist, and argv-only execution) — this section
 adds routing, not a bypass of those checks.
 
-Shape examples: `/livedocs:look-up R` → runtime introspect; R currently resolves
-not-resolved (no R runtime adapter) → web-latest R docs with that caveat stated ·
-`/livedocs:look-up javascript` → normalized to `node`, anchored to the local
-Node version · `/livedocs:look-up react@18` → registry docs pinned to 18 ·
-`/livedocs:look-up serde@1.0.100` → you name `ecosystem:"crates"`; registry
-serves latest — state that the pin was not applied ·
+Shape examples: `/livedocs:look-up R` → runtime introspect via the R depth
+adapter — anchored to the local R toolchain version when R/Rscript is installed;
+DESCRIPTION `Depends` is only a lower-bound cross-check (never the effective
+version), and with no toolchain the honest not-resolved degrade applies ·
+`/livedocs:look-up javascript` → engine alias to the `node` adapter, anchored to
+the local Node version · `/livedocs:look-up npm:go` → **ecosystem hint** overrides
+language shadowing → the npm package `go` (not the Go runtime) ·
+`/livedocs:look-up cran:dplyr` → hint names CRAN → `resolve_source{ecosystem:"cran"}`
+for `dplyr` · `/livedocs:look-up crates:serde@1.0.100` → hint + pin →
+`ecosystem:"crates"`, `version:"1.0.100"`, confirmed at the per-version endpoint ·
+`/livedocs:look-up react@18.3.1` → registry pins the
+exact version (`pin_honored:true`); a partial `react@18` or a dist-tag isn't an
+exact version and comes back `pin_honored:false` ·
+`/livedocs:look-up serde@1.0.100` → you name `ecosystem:"crates"`; the pin is
+confirmed at the crates per-version endpoint (`pin_honored:true`, `version` is
+1.0.100) while the docs/repo URLs stay latest-labeled ·
 `/livedocs:look-up dplyr mutate` → you name `ecosystem:"cran"`, resolve dplyr,
 read docs for `mutate` · `/livedocs:look-up https://api.example.com/openapi.json`
 → OpenAPI introspection · `/livedocs:look-up https://hono.dev` → docs-site

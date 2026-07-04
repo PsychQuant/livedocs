@@ -2,34 +2,34 @@
 
 # Testing
 
-LiveDocs has two independent test suites — **160 tests, all green**. The Swift suite verifies
+LiveDocs has two independent test suites — **194 tests, all green**. The Swift suite verifies
 the engine; the Python suite verifies that the `look-up` *skill* actually triggers a
 LiveDocs query and answers currently, plus the vs-context7 comparison harness. Counts below
 are a snapshot; the source of truth is running the suites.
 
 ```bash
-swift test                                  # 110 Swift tests
+swift test                                  # 144 Swift tests
 python3 -m pytest evals/look-up/tests/  # 50 Python eval tests
 ```
 
-## Swift — 110 tests (`swift test`)
+## Swift — 144 tests (`swift test`)
 
 Split along the pure-core / MCP-shell architecture. `LiveDocsCore` is dependency-free and
 tested without a network (HTTP is injected as a fake); `CheLiveDocsMCP` covers the process
 and file-system layer.
 
-### `LiveDocsCoreTests` — 99 (pure logic)
+### `LiveDocsCoreTests` — 115 (pure logic)
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `RuntimeIntrospectionTests` | 25 | Language-runtime detection: pin parsers (`.tool-versions`, mise, idiomatic `.<lang>-version`), the precedence engine (active toolchain authoritative), mise inline-comment / array rejection, multi-line / alias rejection. |
-| `RegistryAdaptersTests` | 11 | Parsers for all 9 registries (npm / PyPI / crates / go / rubygems / JSR / packagist / maven / CRAN). |
+| `RuntimeIntrospectionTests` | 30 | Language-runtime detection: pin parsers (`.tool-versions`, mise, idiomatic `.<lang>-version`), the precedence engine (active toolchain authoritative), mise inline-comment / array rejection, multi-line / alias rejection, R toolchain-banner parsing + DESCRIPTION `Depends` constraint, javascript→node canonicalization before the safety gate. |
+| `RegistryAdaptersTests` | 15 | Parsers for all 9 registries (npm / PyPI / crates / go / rubygems / JSR / packagist / maven / CRAN), the three per-version confirm parsers (crates/go/rubygems pins), and `supportsVersionPin` coverage. |
 | `URLSafetyTests` | 9 | SSRF guard: scheme allowlist + loopback / link-local (`169.254`) / RFC-1918 / ULA / metadata host classification. |
 | `TextSanitizeTests` | 7 | Control / ANSI / OSC / bidi / zero-width stripping of fetched content + UTF-8 byte truncation. |
 | `LLMSTxtTests` | 6 | `llms.txt` candidate ordering, soft-404 content-type guard, index/full flavor split. |
 | `IntrospectionTests` | 6 | OpenAPI / GraphQL schema parsing (method allowlist, shape-only, deterministic ordering). |
 | `RIntrospectionTests` | 6 | Installed-R-package version parsing + safe-name validation. |
-| `EngineTests` | 5 | Discovery chain over injected HTTP fakes (registry → llms.txt → repo). |
+| `EngineTests` | 12 | Discovery chain over injected HTTP fakes (registry → llms.txt → repo), non-npm/pypi version-pin honoring (`pin_honored` true/false/nil), the latest-only-ecosystem engine path setting `pin_honored=false`, and auto-detect's two-pass pin resolution (fall through npm→PyPI for an exact pin, then fall back to npm latest+false when the pin exists nowhere). |
 | `ETagCacheTests` | 5 | ETag revalidation semantics (304 → cached, 200 → refresh, never blind-stale, POST never cached). |
 | `RegistryTests` | 5 | Per-ecosystem registry resolution + version pinning. |
 | `ClassificationTests` | 4 | Soft-404 hit/miss classification. |
@@ -37,12 +37,13 @@ and file-system layer.
 | `ValidationTests` | 4 | Boundary validation (package/version strings can't inject URL structure). |
 | `RankingTests` | 2 | Fidelity-then-freshness ranking with a stable tiebreak. |
 
-### `CheLiveDocsMCPTests` — 11 (process / file layer)
+### `CheLiveDocsMCPTests` — 29 (process / file layer)
 
 | File | Tests | Covers |
 |------|------:|--------|
-| `RuntimeIntrospectTests` | 7 | Symlink version-file refusal (secret-exfil guard), uncovered-language fallback to the universal pin layer, canonical `mise.toml`, PATH-first executable resolution. |
+| `RuntimeIntrospectTests` | 11 | Symlink version-file refusal (secret-exfil guard), uncovered-language fallback to the universal pin layer, canonical `mise.toml`, PATH-first executable resolution, uppercase-id acceptance with requested-id preservation (R / JavaScript), javascript↔node resolution equivalence. |
 | `ProcessRunnerTests` | 4 | Large output doesn't deadlock (concurrent pipe drain), exit code surfaces, timeout reported, SIGTERM→SIGKILL escalation. |
+| `LatestVersionEncodingTests` | 14 | `latest_version` tool boundary: `pin_honored` true/false/nil surfacing (incl. `false` in the nothing-resolved path, and absent when no pin asked), the Go `v`-prefix confirmed-pin case (must not read as not-applied), v-prefixed input building a valid confirm URL, npm not-found → latest+false, npm dist-tag / exact-pin discrimination (a moving tag is never a faked pin), RubyGems end-to-end pin (honored + not-found). |
 
 ## Python — 50 tests (`pytest evals/look-up/`)
 

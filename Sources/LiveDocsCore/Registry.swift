@@ -11,19 +11,31 @@ public struct RegistryResolution: Sendable, Equatable {
     public var repository: String?
     public var changelog: String?
     public var documentation: String?
+    /// Whether a requested version pin was actually applied (issue #36).
+    /// `nil` = no pin was requested; `true` = the pin was confirmed at a
+    /// first-class per-version endpoint and `version` reflects it exactly;
+    /// `false` = a pin was requested but not confirmed as an exact version — a
+    /// latest-only ecosystem, an unknown version, or a non-exact token (an npm
+    /// dist-tag/partial version resolves to some OTHER concrete version). On
+    /// `false`, `version` is the registry's current resolution (the latest, or
+    /// the concrete version a tag/partial resolved to) — NOT guaranteed latest
+    /// and NOT a confirmed pin. We never fake a pin.
+    public var pinHonored: Bool?
 
     public init(
         version: String? = nil,
         homepage: String? = nil,
         repository: String? = nil,
         changelog: String? = nil,
-        documentation: String? = nil
+        documentation: String? = nil,
+        pinHonored: Bool? = nil
     ) {
         self.version = version
         self.homepage = homepage
         self.repository = repository
         self.changelog = changelog
         self.documentation = documentation
+        self.pinHonored = pinHonored
     }
 }
 

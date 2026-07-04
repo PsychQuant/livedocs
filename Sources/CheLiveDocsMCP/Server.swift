@@ -37,7 +37,7 @@ final class CheLiveDocsMCPServer {
                             .string("rubygems"), .string("jsr"), .string("packagist"), .string("maven"), .string("cran")]),
             "description": .string("Package registry the library lives in. npm/pypi auto-detect if omitted; crates/go/rubygems/jsr/packagist/maven/cran MUST be named explicitly. Library format per ecosystem: npm 'react' or '@scope/name'; go full module path 'github.com/gin-gonic/gin'; jsr '@scope/name'; packagist 'vendor/package'; maven 'group:artifact'; cran (R) 'dplyr'.")
         ])
-        let versionProp: Value = .object(["type": .string("string"), "description": .string("Pin to a specific version, e.g. '18.3.1' (React 18 vs 19). Honored for npm/pypi; other ecosystems are latest-only. llms.txt docs are always latest and get labeled as not-pinned.")])
+        let versionProp: Value = .object(["type": .string("string"), "description": .string("Pin to a specific version, e.g. '18.3.1' (React 18 vs 19). Honored for npm/pypi/crates/go/rubygems (confirmed at their per-version endpoints; latest_version returns pin_honored:true/false); jsr/packagist/maven/cran are latest-only and report pin_honored:false. llms.txt docs are always latest and get labeled as not-pinned.")])
         return [
             Tool(
                 name: "resolve_source",
@@ -66,7 +66,7 @@ final class CheLiveDocsMCPServer {
             ),
             Tool(
                 name: "latest_version",
-                description: "The deterministic 'what is the latest released version right now' answer for a library, from its package registry, plus changelog/repo URLs. This is the strongest currency signal — more reliable than scraping a docs page.",
+                description: "The deterministic 'what is the latest released version right now' answer for a library, from its package registry, plus changelog/repo URLs. This is the strongest currency signal — more reliable than scraping a docs page. When you pass a version pin, the response includes pin_honored (true = confirmed at the ecosystem's per-version endpoint and 'version' is the pin; false = the pin was not confirmed as an exact version — a latest-only ecosystem, an unknown version, or a non-exact token like an npm dist-tag/partial version. On false, 'version' is the registry's current resolution, which may be the latest OR the concrete version a tag/partial resolved to — NOT guaranteed to be the latest stable, and not a confirmed pin).",
                 inputSchema: .object([
                     "type": .string("object"),
                     "properties": .object([
@@ -79,7 +79,7 @@ final class CheLiveDocsMCPServer {
             ),
             Tool(
                 name: "introspect",
-                description: "Introspect the HIGHEST-fidelity 'what can I actually call' source that lives OUTSIDE the web: an OpenAPI/Swagger JSON spec, a GraphQL endpoint's schema, an installed CLI's --help/--version, or the LOCALLY INSTALLED version of an R package (kind=r-pkg — the 'local' half of a version check; READ-ONLY, never installs). For the effective LANGUAGE-RUNTIME version of the current project (Python/Node/Go/Rust/Java/.NET/Swift), use kind=runtime with target=<language> or 'auto' — active toolchain is authoritative, declared pins cross-check, unresolved is reported honestly (READ-ONLY). This reads the machine/installed artifact itself, not prose about it. target = a URL (openapi/graphql), a bare command name (cli), or an R package name (r-pkg). kind defaults to auto (URL → try openapi then graphql; bare word → cli).",
+                description: "Introspect the HIGHEST-fidelity 'what can I actually call' source that lives OUTSIDE the web: an OpenAPI/Swagger JSON spec, a GraphQL endpoint's schema, an installed CLI's --help/--version, or the LOCALLY INSTALLED version of an R package (kind=r-pkg — the 'local' half of a version check; READ-ONLY, never installs). For the effective LANGUAGE-RUNTIME version of the current project (Python/Node/Go/Rust/Java/.NET/Swift/R; 'javascript' aliases to node), use kind=runtime with target=<language> or 'auto' — active toolchain is authoritative, declared pins cross-check, unresolved is reported honestly (READ-ONLY). This reads the machine/installed artifact itself, not prose about it. target = a URL (openapi/graphql), a bare command name (cli), or an R package name (r-pkg). kind defaults to auto (URL → try openapi then graphql; bare word → cli).",
                 inputSchema: .object([
                     "type": .string("object"),
                     "properties": .object([
@@ -146,26 +146,8 @@ final class CheLiveDocsMCPServer {
             guard let lib = args["library"]?.stringValue else { throw ToolError.missing("library") }
             let eco = args["ecosystem"]?.stringValue.flatMap(Ecosystem.init(rawValue:))
             let pin = args["version"]?.stringValue
-            if let res = await engine.latestVersion(library: lib, ecosystem: eco, version: pin) {
-                // A pin was asked for but the resolved version differs → the pin was
-                // ignored (latest-only ecosystem) or wasn't matched. Say so instead of
-                // passing latest off as the pinned version.
-                if let pin, res.version != pin {
-                    return jsonString([
-                        "version": res.version as Any, "requested": pin,
-                        "note": "Pinned version '\(pin)' not applied — this ecosystem is latest-only (only npm/pypi honor a pin), or the version wasn't found; 'version' is the latest.",
-                        "changelog": res.changelog as Any, "repository": res.repository as Any,
-                        "documentation": res.documentation as Any, "homepage": res.homepage as Any])
-                }
-                return encodeResolution(res)
-            }
-            // A pinned version that didn't resolve: fall back to latest so the agent
-            // learns the current version instead of a bare null.
-            if let pin, let latest = await engine.latestVersion(library: lib, ecosystem: eco) {
-                return jsonString(["version": NSNull(), "requested": pin, "latest": latest.version as Any,
-                                   "note": "Version \(pin) not found; current latest shown under 'latest'."])
-            }
-            return #"{"version":null,"note":"Not found. For crates/go/rubygems/jsr/packagist/maven you must pass ecosystem explicitly (and the right library format)."}"#
+            let res = await engine.latestVersion(library: lib, ecosystem: eco, version: pin)
+            return encodeLatestVersion(res, library: lib, pin: pin, eco: eco)
 
         case "introspect":
             guard let target = args["target"]?.stringValue else { throw ToolError.missing("target") }
@@ -187,7 +169,7 @@ final class CheLiveDocsMCPServer {
         case "r-pkg":
             return encodeRInstalled(package: target)
         case "runtime":
-            let langId = (target == "auto" || target.isEmpty) ? nil : target
+            let langId = (target.lowercased() == "auto" || target.isEmpty) ? nil : target
             let cwd = try runtimeCwd(path)
             return encodeRuntime(RuntimeIntrospect.resolve(cwd: cwd, languageId: langId), cwd: cwd)
         case "openapi":
@@ -232,14 +214,61 @@ final class CheLiveDocsMCPServer {
         return jsonString(["sources": arr])
     }
 
-    private func encodeResolution(_ r: RegistryResolution) -> String {
-        jsonString([
+    private func encodeResolution(_ r: RegistryResolution, note: String? = nil) -> String {
+        var obj: [String: Any] = [
             "version": r.version as Any,
             "changelog": r.changelog as Any,
             "documentation": r.documentation as Any,
             "repository": r.repository as Any,
             "homepage": r.homepage as Any
-        ])
+        ]
+        // pin_honored is a pin-request-only fact: emit it only when a pin was
+        // actually requested (nil = no pin asked) so agents get a machine-readable
+        // signal instead of parsing note text (issue #36).
+        if let honored = r.pinHonored { obj["pin_honored"] = honored }
+        if let note { obj["note"] = note }
+        return jsonString(obj)
+    }
+
+    /// Build the `latest_version` tool response. Decides honored-vs-not from
+    /// `pinHonored` (NOT string equality — Go pins carry a `v` prefix, so
+    /// `version != pin` would misread a confirmed pin as not-applied), and always
+    /// routes through `encodeResolution` so the `pin_honored` signal reaches the
+    /// caller in every case, not just the exact-match one (issue #36 verify).
+    /// `internal` (not private) so the boundary logic is unit-testable without the
+    /// MCP transport layer.
+    func encodeLatestVersion(_ res: RegistryResolution?, library: String, pin: String?, eco: Ecosystem?) -> String {
+        guard let res else {
+            // No resolution at all — package (or its whole registry) not found.
+            // A pin was requested but couldn't be honored (there's nothing to pin
+            // to), so still emit pin_honored:false — a requested pin ALWAYS gets a
+            // machine-readable signal, never absent (which would read as "no pin
+            // asked"). Issue #36 round-3.
+            if let pin {
+                return jsonString(["version": NSNull(), "requested": pin, "pin_honored": false,
+                                   "note": "Not found for '\(library)'. Pass the right ecosystem (crates/go/rubygems/jsr/packagist/maven need it explicitly) and library format."])
+            }
+            return #"{"version":null,"note":"Not found. For crates/go/rubygems/jsr/packagist/maven you must pass ecosystem explicitly (and the right library format)."}"#
+        }
+        // A pin was requested but not honored → attach an accurate, ecosystem-aware
+        // note alongside the machine-readable pin_honored:false. Auto-detect (nil
+        // eco) only tries npm/pypi, which DO support pins → treat as pin-supporting.
+        if let pin, res.pinHonored == false {
+            // Two false sub-cases. Latest-only ecosystems never attempt a pin, so
+            // 'version' is definitively the latest. For pin-supporting ecosystems a
+            // false means the pin wasn't confirmed as an exact version — it may be a
+            // dist-tag/range that resolved to some OTHER concrete version, or an
+            // unknown version that fell back to latest; either way 'version' is the
+            // registry's resolution, not a confirmed pin (don't over-claim "latest").
+            let note: String
+            if !(eco?.supportsVersionPin ?? true) {
+                note = "Pin '\(pin)' not applied — this ecosystem is latest-only (jsr/packagist/maven/cran); 'version' is the latest. npm/pypi/crates/go/rubygems honor a confirmed pin."
+            } else {
+                note = "Pin '\(pin)' not confirmed as an exact version (it may be a dist-tag, partial version, or an unknown version); 'version' is the registry's current resolution, not a confirmed pin."
+            }
+            return encodeResolution(res, note: note)
+        }
+        return encodeResolution(res)
     }
 
     private func encodeOpenAPI(_ s: OpenAPISummary) -> String {
