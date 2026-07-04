@@ -2,16 +2,16 @@
 
 # 測試
 
-LiveDocs 有兩套獨立 test suite —— **151 個 test,全綠**。Swift suite 驗證引擎;Python suite
+LiveDocs 有兩套獨立 test suite —— **160 個 test,全綠**。Swift suite 驗證引擎;Python suite
 驗證 `look-up` *skill* 是否真的會激起 LiveDocs 查詢並給出現行答案, 外加 vs-context7 比較
 harness。以下計數是快照;真正的 source of truth 是實際跑一次。
 
 ```bash
-swift test                                  # 110 個 Swift test
+swift test                                  # 119 個 Swift test
 python3 -m pytest evals/look-up/tests/  # 41 個 Python eval test
 ```
 
-## Swift — 110 個 test（`swift test`）
+## Swift — 119 個 test（`swift test`）
 
 依 pure-core / MCP-shell 架構分兩層。`LiveDocsCore` 無依賴、不碰網路(HTTP 用 fake 注入);
 `CheLiveDocsMCP` 覆蓋 process 與檔案系統層。
@@ -20,7 +20,7 @@ python3 -m pytest evals/look-up/tests/  # 41 個 Python eval test
 
 | 檔案 | 數 | 測什麼 |
 |------|---:|--------|
-| `RuntimeIntrospectionTests` | 25 | 語言 runtime 偵測:pin parser(`.tool-versions`、mise、idiomatic `.<lang>-version`)、precedence engine(active toolchain 權威)、mise 註解/陣列拒絕、多行/alias 拒絕。 |
+| `RuntimeIntrospectionTests` | 30 | 語言 runtime 偵測:pin parser(`.tool-versions`、mise、idiomatic `.<lang>-version`)、precedence engine(active toolchain 權威)、mise 註解/陣列拒絕、多行/alias 拒絕、R toolchain banner 解析 + DESCRIPTION `Depends` constraint、javascript→node 先正規化再過安全閘。 |
 | `RegistryAdaptersTests` | 11 | 9 個 registry 的 parser(npm / PyPI / crates / go / rubygems / JSR / packagist / maven / CRAN)。 |
 | `URLSafetyTests` | 9 | SSRF guard:scheme allowlist + loopback / link-local（`169.254`）/ RFC-1918 / ULA / metadata host 判定。 |
 | `TextSanitizeTests` | 7 | 對 fetched 內容的 control / ANSI / OSC / bidi / zero-width 過濾 + UTF-8 byte 截斷。 |
@@ -39,7 +39,7 @@ python3 -m pytest evals/look-up/tests/  # 41 個 Python eval test
 
 | 檔案 | 數 | 測什麼 |
 |------|---:|--------|
-| `RuntimeIntrospectTests` | 7 | symlink 版本檔拒絕(防機密外洩)、未覆蓋語言 fallback 到 universal pin layer、canonical `mise.toml`、PATH-first executable 解析。 |
+| `RuntimeIntrospectTests` | 11 | symlink 版本檔拒絕(防機密外洩)、未覆蓋語言 fallback 到 universal pin layer、canonical `mise.toml`、PATH-first executable 解析、大寫 id 接受且保留請求原 id(R / JavaScript)、javascript↔node 解析等價。 |
 | `ProcessRunnerTests` | 4 | 大輸出不 deadlock(並發讀 pipe)、exit code 浮現、timeout 回報、SIGTERM→SIGKILL escalation。 |
 
 ## Python — 41 個 test（`pytest evals/look-up/`）
@@ -67,5 +67,5 @@ python3 -m pytest evals/look-up/tests/  # 41 個 Python eval test
 ## 紀律
 
 安全與健壯性關鍵面都是 test-first(TDD)建的:`URLSafety`、`TextSanitize`、`ProcessRunner`、
-eval harness 都先有失敗的 test 才寫實作。v0.7.0 hardening 期間 Swift test 從 72 → 110(補上
+eval harness 都先有失敗的 test 才寫實作。v0.7.0 hardening 與 R-adapter 工作期間 Swift test 從 72 → 119(補上
 之前沒測的 MCP shell 層),Python eval 從 0 → 41(skill eval + vs-context7)。

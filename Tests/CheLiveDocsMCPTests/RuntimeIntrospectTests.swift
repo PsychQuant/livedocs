@@ -92,4 +92,49 @@ final class RuntimeIntrospectTests: XCTestCase {
     func testResolveExecutableNilForNonsense() {
         XCTAssertNil(ProcessRunner.resolveExecutable("definitely-not-a-real-binary-xyzzy"))
     }
+
+    // MARK: - #35 case-insensitive targets + javascript alias (end to end)
+
+    func testResolveAcceptsUppercaseRAndPreservesRequestedId() {
+        // The flagship `/livedocs:look-up R` sends target="R" verbatim. The raw
+        // id must be canonicalized BEFORE the lowercase-only safety gate — the
+        // pre-fix code returned [] here (PR #40 verify HIGH).
+        let results = RuntimeIntrospect.resolve(cwd: dir, languageId: "R")
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.languageId, "R")   // requested casing preserved
+    }
+
+    func testResolveJavascriptAliasKeepsRequestedIdAcrossCasing() {
+        // Alias goes through the node adapter, but the caller-facing id stays
+        // exactly as requested — returning "node" would break the spec's
+        // "result keeps the requested identifier" clause.
+        for spelled in ["javascript", "JavaScript"] {
+            let results = RuntimeIntrospect.resolve(cwd: dir, languageId: spelled)
+            XCTAssertEqual(results.count, 1, "id '\(spelled)' must not be rejected")
+            XCTAssertEqual(results.first?.languageId, spelled)
+        }
+    }
+
+    func testResolveJavascriptMatchesNodeWhenNodeUnresolvable() throws {
+        // In an empty dir with no node version source, javascript must degrade
+        // exactly as node does (notResolved), never invent a distinct runtime.
+        // (If the machine has a global node on PATH both resolve identically
+        // via the probe — equality is asserted either way.)
+        let js = RuntimeIntrospect.resolve(cwd: dir, languageId: "javascript")[0].resolution
+        let node = RuntimeIntrospect.resolve(cwd: dir, languageId: "node")[0].resolution
+        switch (js, node) {
+        case (.resolved(let v1, let s1, _, _), .resolved(let v2, let s2, _, _)):
+            XCTAssertEqual(v1, v2)
+            XCTAssertEqual(s1, s2)
+        case (.notResolved, .notResolved):
+            break   // equally unresolved — honest degrade
+        default:
+            XCTFail("javascript and node must resolve identically, got \(js) vs \(node)")
+        }
+    }
+
+    func testResolveStillRejectsUnsafeIds() {
+        XCTAssertTrue(RuntimeIntrospect.resolve(cwd: dir, languageId: "../evil").isEmpty)
+        XCTAssertTrue(RuntimeIntrospect.resolve(cwd: dir, languageId: "py thon").isEmpty)
+    }
 }

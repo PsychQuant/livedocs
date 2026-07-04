@@ -221,4 +221,66 @@ final class RuntimeIntrospectionTests: XCTestCase {
     func testIdiomaticSkipsCommentLines() {
         XCTAssertEqual(parseIdiomaticVersionFile("# a comment\n\n3.2.2"), "3.2.2")
     }
+
+    // MARK: - R depth adapter (issue #35)
+
+    func testParseToolchainVersionParsesROutputs() {
+        XCTAssertEqual(parseToolchainVersion("R version 4.4.1 (2024-06-14) -- \"Race for Your Life\"", language: .r), "4.4.1")
+        XCTAssertEqual(parseToolchainVersion("Rscript (R) version 4.4.1 (2024-06-14)", language: .r), "4.4.1")
+    }
+
+    func testParseRDescription() {
+        let desc = """
+        Package: mypkg
+        Title: A Package
+        Depends: R (>= 4.1.0),
+            methods
+        Imports: rlang
+        """
+        XCTAssertEqual(parseRDescription(desc), "4.1.0")
+        XCTAssertEqual(parseRDescription("Depends: R (>= 3.5)"), "3.5")
+        XCTAssertNil(parseRDescription("Package: nodeps\nImports: rlang"))
+        XCTAssertNil(parseRDescription("Depends: methods, utils"))   // no R entry
+        // A bare exclusive `>` is NOT our lower-bound contract — never weaken it to >=.
+        XCTAssertNil(parseRDescription("Depends: R (> 4.1.0)"))
+        // Trailing prose must not leak into the version string.
+        XCTAssertEqual(parseRDescription("Depends: R (>= 4.1.0 patched)"), "4.1.0")
+        // Duplicate Depends fields: the first field carrying an R entry wins.
+        XCTAssertEqual(parseRDescription("Depends: R (>= 4.2.0)\nDepends: methods"), "4.2.0")
+        // CRLF line endings are tolerated.
+        XCTAssertEqual(parseRDescription("Depends: R (>= 4.3)\r\nImports: rlang"), "4.3")
+    }
+
+    func testDetectLanguagesFindsR() {
+        // Bare DESCRIPTION is too weak (generic description files exist) —
+        // the NAMESPACE companion every R package ships is required.
+        XCTAssertFalse(detectLanguages(files: ["DESCRIPTION"]).contains(.r))
+        XCTAssertTrue(detectLanguages(files: ["DESCRIPTION", "NAMESPACE"]).contains(.r))
+        XCTAssertTrue(detectLanguages(files: ["renv.lock"]).contains(.r))
+        XCTAssertTrue(detectLanguages(files: [".r-version"]).contains(.r))
+        XCTAssertTrue(detectLanguages(files: ["analysis.Rproj"]).contains(.r))
+        XCTAssertTrue(detectLanguages(files: ["analysis.rproj"]).contains(.r))
+        XCTAssertFalse(detectLanguages(files: ["package.json"]).contains(.r))
+    }
+
+    func testNormalizedRuntimeTargetCanonicalizesBeforeGating() {
+        // The case-insensitive contract: canonicalize BEFORE the lowercase-only
+        // safety gate, so natural spellings survive (PR #40 verify HIGH).
+        XCTAssertEqual(normalizedRuntimeTarget("R"), "r")
+        XCTAssertEqual(normalizedRuntimeTarget("JavaScript"), "node")
+        XCTAssertEqual(normalizedRuntimeTarget("Python"), "python")
+        XCTAssertNil(normalizedRuntimeTarget("../evil"))
+        XCTAssertNil(normalizedRuntimeTarget("py thon"))
+        XCTAssertNil(normalizedRuntimeTarget(""))
+    }
+
+    // MARK: - javascript -> node alias (issue #35)
+
+    func testCanonicalRuntimeTargetAliasesJavascriptToNode() {
+        XCTAssertEqual(canonicalRuntimeTarget("javascript"), "node")
+        XCTAssertEqual(canonicalRuntimeTarget("JavaScript"), "node")
+        XCTAssertEqual(canonicalRuntimeTarget("node"), "node")
+        XCTAssertEqual(canonicalRuntimeTarget("r"), "r")
+        XCTAssertEqual(canonicalRuntimeTarget("Python"), "python")
+    }
 }
