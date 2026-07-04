@@ -27,6 +27,7 @@ import json
 import os
 import re
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SAMPLE_PATH = os.path.join(HERE, "compare_context7_sample.json")
@@ -117,6 +118,26 @@ def render_table(rows):
 # the block; `--emit-readme --check` turns drift into a failure.
 README_BEGIN = "<!-- BEGIN vs-context7 (generated: compare_context7.py --emit-readme --write — do not hand-edit) -->"
 README_END = "<!-- END vs-context7 -->"
+# Single sentinel-to-sentinel matcher, reused by every path that reads/writes the
+# block so they can never diverge. Non-greedy + DOTALL: one block spans newlines
+# but stops at the first END (#46 verify — a crafted captured_at can't smuggle an
+# END either; render_readme_block validates the date shape first).
+_SENTINEL_RE = re.compile(re.escape(README_BEGIN) + r".*?" + re.escape(README_END), re.DOTALL)
+# captured_at must be exactly an ISO date — rejects a missing/blank date (which would
+# ship "captured None") AND any value carrying markup/sentinels (injection guard).
+_ISO_DATE_RE = re.compile(r"\A\d{4}-\d{2}-\d{2}\Z")
+
+
+def _sole_block(readme_text):
+    """Return the one sentinel-delimited block's text, or raise if there is not
+    EXACTLY one. Exactly-one is the invariant the drift guard rests on: a first-match
+    `re.search` would let a second, stale block slip past `--check` undetected (#46 verify)."""
+    blocks = _SENTINEL_RE.findall(readme_text)
+    if len(blocks) != 1:
+        raise ValueError(
+            f"expected exactly one vs-context7 sentinel block in README, found {len(blocks)}"
+        )
+    return blocks[0]
 
 
 def render_bar_chart(t, captured_at, width=26):
@@ -131,6 +152,7 @@ def render_bar_chart(t, captured_at, width=26):
 
     def bar(count):
         filled = round(width * count / n) if n else 0
+        filled = max(0, min(filled, width))   # defensive: a malformed tally can't overflow the bar
         return "█" * filled + "░" * (width - filled)
 
     lo, c7 = t["livedocs_current"], t["context7_current"]
@@ -145,7 +167,16 @@ def render_bar_chart(t, captured_at, width=26):
 def render_readme_block(rows, captured_at):
     """The full sentinel-delimited README section: the bar chart in a fenced code
     block + a one-line pointer to the harness. Reuses tally() so the chart and the
-    CLI summary can never disagree."""
+    CLI summary can never disagree.
+
+    Refuses to emit unless captured_at is a bare ISO date — a competitive claim on the
+    front page must carry a real date, and this also blocks a crafted snapshot from
+    injecting markup / a stray END sentinel into the block (#46 verify)."""
+    if not _ISO_DATE_RE.match(str(captured_at) if captured_at is not None else ""):
+        raise ValueError(
+            f"captured_at must be an ISO date (YYYY-MM-DD); got {captured_at!r}. "
+            "Refusing to emit a README competitive claim with a missing/malformed date."
+        )
     chart = render_bar_chart(tally(rows), captured_at)
     return "\n".join([
         README_BEGIN,
@@ -165,13 +196,28 @@ def readme_path():
 
 
 def replace_readme_block(readme_text, new_block):
-    """Return readme_text with its sentinel-delimited vs-context7 block replaced.
-    Raises ValueError if the sentinels are missing (never silently appends)."""
-    pattern = re.compile(re.escape(README_BEGIN) + r".*?" + re.escape(README_END), re.DOTALL)
-    if not pattern.search(readme_text):
-        raise ValueError("vs-context7 sentinels not found in README — add them first")
+    """Return readme_text with its (single) sentinel-delimited vs-context7 block
+    replaced. Raises ValueError unless EXACTLY one block is present — never silently
+    appends, never leaves a second stale block behind (#46 verify)."""
+    _sole_block(readme_text)   # assert exactly one; raises otherwise
     # lambda replacement avoids re interpreting backslashes / group refs in new_block
-    return pattern.sub(lambda _m: new_block, readme_text, count=1)
+    return _SENTINEL_RE.sub(lambda _m: new_block, readme_text, count=1)
+
+
+def _atomic_write(path, text):
+    """Write text to path via a temp file + os.replace so an interrupted write never
+    leaves README.md truncated (#46 verify)."""
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path) or ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
 
 
 def load_sample(path=SAMPLE_PATH):
@@ -193,6 +239,11 @@ def main(argv=None):
                     help="with --emit-readme: exit 1 if README's block drifted from the snapshot (fail-loud guard)")
     args = ap.parse_args(argv)
 
+    # --write / --check are modifiers of --emit-readme; without it they silently
+    # no-op'd and a mis-invoked `--check` guard exited 0 (false pass, #46 verify).
+    if (args.check or args.write) and not args.emit_readme:
+        ap.error("--check / --write require --emit-readme")
+
     sample = load_sample(args.sample)
     results = sample.get("results", [])
     rows = [judge_row(e) for e in results]
@@ -203,11 +254,13 @@ def main(argv=None):
         if args.check:
             with open(path, encoding="utf-8") as f:
                 current = f.read()
-            m = re.search(re.escape(README_BEGIN) + r".*?" + re.escape(README_END), current, re.DOTALL)
-            if not m:
-                print("✗ README vs-context7 sentinels missing", file=sys.stderr)
+            try:
+                committed = _sole_block(current)   # exactly one block, or fail loud
+            except ValueError as exc:
+                print(f"✗ {exc} — run: python3 evals/look-up/compare_context7.py --emit-readme --write",
+                      file=sys.stderr)
                 return 1
-            if m.group(0).strip() != block.strip():
+            if committed.strip() != block.strip():
                 print("✗ README vs-context7 block is stale — run: "
                       "python3 evals/look-up/compare_context7.py --emit-readme --write", file=sys.stderr)
                 return 1
@@ -216,8 +269,7 @@ def main(argv=None):
         if args.write:
             with open(path, encoding="utf-8") as f:
                 current = f.read()
-            with open(path, "w", encoding="utf-8") as f:
-                f.write(replace_readme_block(current, block))
+            _atomic_write(path, replace_readme_block(current, block))   # raises unless exactly one block
             print(f"✓ wrote vs-context7 block to {path}")
             return 0
         print(block)

@@ -160,6 +160,63 @@ def test_emit_readme_block_matches_committed_readme():
     )
 
 
+def test_check_via_main_in_sync():
+    # #46 verify (DA): the fail-loud exit path lives in main(), but the drift test
+    # re-implements the regex instead of driving main(). Drive the ACTUAL CLI entry:
+    # --emit-readme --check against the committed README returns 0.
+    from compare_context7 import main
+    assert main(["--emit-readme", "--check"]) == 0
+
+
+def test_check_via_main_flags_drift(tmp_path):
+    # Feed a sample whose captured_at differs → emitted block no longer matches the
+    # committed README → --check must return 1. This exercises the real fail-loud
+    # exit code (main() returns 1), not a re-derived comparison.
+    import json as _json
+    from compare_context7 import main, load_sample, SAMPLE_PATH
+    sample = load_sample(SAMPLE_PATH)
+    sample["captured_at"] = "2020-01-01"          # valid date, but ≠ the committed block's
+    drifted = tmp_path / "drifted_sample.json"
+    drifted.write_text(_json.dumps(sample), encoding="utf-8")
+    assert main(["--emit-readme", "--check", "--sample", str(drifted)]) == 1
+
+
+def test_check_write_require_emit_readme():
+    # #46 verify: --check / --write without --emit-readme must be a usage error
+    # (argparse SystemExit), NOT a silent exit-0 false pass.
+    import pytest
+    from compare_context7 import main
+    with pytest.raises(SystemExit):
+        main(["--check"])
+    with pytest.raises(SystemExit):
+        main(["--write"])
+
+
+def test_render_readme_block_rejects_bad_captured_at():
+    # #46 verify: a missing/malformed date must fail loud (never ship "captured None"),
+    # and a value carrying markup can't inject a sentinel into the emitted block.
+    import pytest
+    from compare_context7 import render_readme_block
+    rows = [{"livedocs_current": True, "context7_current": False}]
+    for bad in (None, "", "captured None", "2026-07-02 --> <!-- END vs-context7 -->", "2026/07/02"):
+        with pytest.raises(ValueError):
+            render_readme_block(rows, bad)
+
+
+def test_replace_readme_block_requires_exactly_one():
+    # #46 verify (HIGH): the guard rests on exactly-one-block. Zero or two sentinel
+    # pairs must raise, so a second stale block can't slip past --check / --write.
+    import pytest
+    from compare_context7 import replace_readme_block, README_BEGIN, README_END
+    one = f"top\n{README_BEGIN}\nX\n{README_END}\nbottom"
+    assert "NEW" in replace_readme_block(one, "NEW")
+    two = f"{README_BEGIN}\nA\n{README_END}\nmid\n{README_BEGIN}\nB\n{README_END}"
+    with pytest.raises(ValueError):
+        replace_readme_block(two, "NEW")
+    with pytest.raises(ValueError):
+        replace_readme_block("no sentinels at all", "NEW")
+
+
 def test_sample_covers_corpus():
     # compare_corpus.yaml is the canonical library list; the recorded sample must
     # cover every one of them (so adding a lib to the corpus without recording its
