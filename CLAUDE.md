@@ -19,7 +19,7 @@ Swift MCP server (engine) + `look-up` skill (routing) + Python evals.
 
 ```bash
 swift test                                   # 144 Swift tests (no network)
-python3 -m pytest evals/look-up/tests/   # 66 Python tests (no API calls)
+python3 -m pytest evals/look-up/tests/   # 72 Python tests (no API calls)
 python3 evals/look-up/compare_context7.py --verify-live   # freshness snapshot drift check
 make release-signed VERSION=vX.Y.Z           # build + sign + notarize + mcpb (needs DEVELOPER_ID/NOTARY_PROFILE)
 bash scripts/sync-wiki.sh                    # mirror docs/wiki/ -> GitHub wiki (after merge)

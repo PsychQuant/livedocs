@@ -1,0 +1,64 @@
+# vs-context7 snapshot freshness (#49): the PR-gate guards (ci.yml) lock README ⟷ sample,
+# but nothing there checks sample ⟷ REALITY. This workflow is that reality check:
+#   1. --verify-live   — re-fetches the registry ground truth (LiveDocs' side; network)
+#                        and exits 1 on drift OR when any library couldn't be verified;
+#   2. --check-staleness — exits 1 when captured_at exceeds the age budget (default 120d).
+#
+# Trigger design (#48/#49 verify round 1):
+# - schedule: monthly reality check. Drift on the fast-mover corpus is EXPECTED over time,
+#   so on scheduled runs the drift step is informational (continue-on-error) and the HARD
+#   red is the staleness budget — one deliberate nag per budget, not a permanent alarm
+#   that trains the maintainer to ignore it.
+# - pull_request (paths): any PR touching the snapshot/corpus runs the LIVE check as a
+#   hard PR gate — a tampered or mis-refreshed sample (fabricated ground_truth) goes red
+#   on the PR itself, closing the "edit the snapshot source and regenerate" hole (#48).
+#   Network cost only on the rare sample-touching PR, never on unrelated PRs.
+# - workflow_dispatch: manual re-run / reproduction.
+#
+# ⚠ KNOWN PLATFORM LIMIT (#49 verify): GitHub auto-disables scheduled workflows after
+# ~60 days of repository inactivity — i.e. the cron dies quietly exactly when the repo
+# goes dormant (which is also when the snapshot rots). If returning to a dormant repo:
+# check the Actions tab (re-enable if disabled) or run --check-staleness by hand.
+# The refresh procedure lives in evals/look-up/README.md § Refreshing the snapshot.
+#
+# Injection surface: the only ${{ }} is `github.event_name` (a trusted context value in
+# a YAML field, not event-payload text in a shell). No secrets; least-privilege token.
+name: vs-context7 freshness
+
+on:
+  schedule:
+    - cron: "17 3 1 * *"   # monthly, 1st @ 03:17 UTC (off-peak, non-round minute)
+  pull_request:
+    paths:
+      - "evals/look-up/compare_context7_sample.json"
+      - "evals/look-up/compare_corpus.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    name: snapshot reality check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install eval-harness dependencies
+        run: pip install -r evals/look-up/requirements.txt
+
+      - name: Registry drift check (LiveDocs-side ground truth)
+        # Informational on SCHEDULED runs (drift on fast-movers is expected over time;
+        # the staleness budget below is the hard signal). Hard-fails on PR runs — a
+        # sample-touching PR must match live reality at merge time.
+        continue-on-error: ${{ github.event_name == 'schedule' }}
+        run: python3 evals/look-up/compare_context7.py --verify-live
+
+      - name: Staleness budget (captured_at age)
+        if: always()   # surface both axes in one run, even if the drift step failed
+        run: python3 evals/look-up/compare_context7.py --check-staleness

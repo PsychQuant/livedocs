@@ -21,7 +21,8 @@ current for some library, it is reported as such.
 
 The comparison data is a dated snapshot in compare_context7_sample.json,
 reproducible by re-running both MCP tools by hand (procedure in README). Pass
---verify-live to re-fetch registry ground truth and warn on drift.
+--verify-live to re-fetch registry ground truth — it exits 1 on drift or when any
+library could not be verified (#49); --check-staleness bounds the snapshot's age.
 """
 import argparse
 import datetime
@@ -160,6 +161,15 @@ def _require_iso_date(value):
         )
 
 
+def staleness_days(captured_at, today):
+    """Days elapsed since the snapshot's captured_at (#49). Pure: `today` is INJECTED
+    (a datetime.date) so tests and the CLI's --today flag never read the wall clock —
+    a wall-clock assertion would itself become the time bomb this exists to catch.
+    Validates captured_at with the same ISO-calendar round-trip as the README guard."""
+    _require_iso_date(captured_at)
+    return (today - datetime.date.fromisoformat(captured_at)).days
+
+
 CHART_ASSET = "docs/assets/vs-context7-freshness.svg"
 
 
@@ -245,6 +255,15 @@ def main(argv=None):
                     help="emit the README vs-context7 block (SVG image embed + caption); compose with --write / --check")
     ap.add_argument("--emit-chart", action="store_true",
                     help="emit the per-library SVG chart asset (issue #50); compose with --write / --check")
+    ap.add_argument("--check-staleness", action="store_true",
+                    help="exit 1 if the snapshot's captured_at is older than --max-age-days (#49; "
+                         "run by the scheduled freshness workflow, NOT PR CI — a time-based failure "
+                         "must never redden unrelated PRs)")
+    ap.add_argument("--max-age-days", type=int, default=120,
+                    help="staleness budget in days for --check-staleness (default: 120)")
+    ap.add_argument("--today", default=None,
+                    help="ISO date override for --check-staleness (tests / reproducing a cron run); "
+                         "defaults to the wall clock")
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument("--write", action="store_true",
                       help="with --emit-readme / --emit-chart: rewrite the target file in place")
@@ -262,6 +281,37 @@ def main(argv=None):
     sample = load_sample(args.sample)
     results = sample.get("results", [])
     rows = [judge_row(e) for e in results]
+
+    if args.check_staleness:
+        captured = sample.get("captured_at")
+        try:
+            if args.today:
+                # Same strict ISO-calendar round-trip as captured_at — Python 3.11+'s bare
+                # fromisoformat is lenient (accepts e.g. "20260702"), which would let a
+                # mistyped override silently parse (#49 verify round 1).
+                _require_iso_date(args.today)
+                today = datetime.date.fromisoformat(args.today)
+            else:
+                today = datetime.date.today()
+        except (ValueError, TypeError):
+            print(f"✗ --today must be an ISO date (YYYY-MM-DD); got {args.today!r}", file=sys.stderr)
+            return 1
+        try:
+            age = staleness_days(captured, today)
+        except ValueError as exc:
+            print(f"✗ {exc}", file=sys.stderr)
+            return 1
+        if age < 0:
+            print(f"✗ captured_at {captured} is in the FUTURE of {today} — clock or snapshot error",
+                  file=sys.stderr)
+            return 1
+        if age > args.max_age_days:
+            print(f"✗ snapshot is {age} days old (captured {captured}; budget {args.max_age_days}d) — "
+                  "the front-page competitive claim is rotting into an ASSERTED number (#27/#29). "
+                  "Refresh per evals/look-up/README.md § Refreshing the snapshot.", file=sys.stderr)
+            return 1
+        print(f"✓ snapshot age {age}d is within the {args.max_age_days}d budget (captured {captured})")
+        return 0
 
     if args.emit_chart:
         from chart import render_svg
@@ -324,14 +374,41 @@ def main(argv=None):
         print("note: --verify-live re-checks the registry (LiveDocs' ground truth) only; "
               "context7's recorded judgments are a dated snapshot, not re-fetched here.",
               file=sys.stderr)
+        drifted, verified, unverified = 0, 0, 0
         for e, r in zip(results, rows):
             lib, eco = e.get("library"), e.get("ecosystem")
             if not lib or not eco:
                 continue
             live = fetch_latest_version(lib, eco)
-            if live and live != r["ground_truth"]:
+            if not live:
+                # fetch_latest_version returns None on network failure OR an ecosystem it
+                # doesn't support — either way this library was NOT verified. Silently
+                # treating that as "no drift" made a registry outage a false GREEN
+                # (#49 verify round 1): green must provably mean "all checked, none drifted".
+                unverified += 1
+                print(f"⚠ unverified: could not fetch a live version for {lib} ({eco}) — "
+                      "registry unreachable or unsupported ecosystem", file=sys.stderr)
+                continue
+            verified += 1
+            if live != r["ground_truth"]:
+                drifted += 1
                 print(f"⚠ drift: {lib} recorded {r['ground_truth']} but registry now {live}",
                       file=sys.stderr)
+        # Fail LOUD (#49): a run that only prints warnings to an unread log is not a
+        # signal. Green must mean "verified all N, none drifted" — drift AND
+        # couldn't-verify both exit 1, with distinct messages.
+        print(f"verified {verified} of {len(results)} recorded ground truths "
+              f"({drifted} drifted, {unverified} unverified)", file=sys.stderr)
+        if drifted:
+            print(f"✗ {drifted} of {len(results)} recorded ground truths have drifted — "
+                  "refresh the snapshot per evals/look-up/README.md § Refreshing the snapshot.",
+                  file=sys.stderr)
+            return 1
+        if unverified:
+            print(f"✗ {unverified} of {len(results)} libraries could not be verified — "
+                  "nothing was proven about them; re-run when the registry is reachable "
+                  "(or add oracle support for the ecosystem).", file=sys.stderr)
+            return 1
 
     t = tally(rows)
     if args.json:

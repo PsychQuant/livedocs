@@ -2,4 +2,7 @@
 #   pip install -r evals/look-up/requirements.txt
 PyYAML>=6.0      # corpus.yaml parsing (run_eval.py)
 pytest>=7.0      # unit tests (tests/)
-matplotlib>=3.9  # per-library vs-context7 SVG chart (chart.py, #50)
+matplotlib>=3.9,<4  # per-library vs-context7 SVG chart (chart.py, #50); <4 cap: CI's
+                    # semantic guard compares a fresh render's <text> strings against the
+                    # committed asset — a major-version serialization change would
+                    # false-FAIL the PR gate (#48 verify), so majors are adopted deliberately.
