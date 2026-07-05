@@ -99,6 +99,11 @@ final class ETagCacheTests: XCTestCase {
         XCTAssertEqual(second.bodyText, "content-1", "304 must serve the DISK-loaded body")
         let hits = await log.count
         XCTAssertEqual(hits, 1, "still exactly one revalidation round-trip — never blind-stale")
+        // Owner-only from birth: the temp file is CREATED 0600 and rename(2)'d in,
+        // so there is never a world-readable window (#58 verify advisory).
+        let perms = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int)
+        XCTAssertEqual(perms & 0o777, 0o600)
     }
 
     func testCorruptCacheFileStartsEmptyAndRecovers() async throws {

@@ -12,8 +12,12 @@ import Foundation
 /// Boundary note: this is a LOCAL cache on the user's machine, inside the
 /// docs/positioning.md anti-positioning line — the forbidden thing is a
 /// shared/central content cache, not local persistence. Semantics are unchanged:
-/// **always revalidate** (the persisted body is only served after the origin
-/// answers 304). Only already-validated 200 responses ever enter the store.
+/// **always revalidate** — the persisted body is only served after the origin
+/// answers 304. That is a FRESHNESS guarantee, not a tamper barrier (#58 verify):
+/// an attacker who can write this file could plant a current etag + a forged
+/// body, but local write access as the user already implies full compromise
+/// (patching the binary is easier) — the file adds no meaningful surface. Only
+/// already-validated 200 responses ever enter the store.
 ///
 /// **Bounded**: without eviction a long session that fetched many docs would keep
 /// every full body (a multi-MB `llms-full.txt` each) for the process lifetime. The
@@ -65,7 +69,13 @@ public actor ETagCacheStore {
         totalBytes += size
         touch(url)
         evictIfNeeded()
-        saveIfPersistent()
+        // Rewrite the disk file only when THIS mutation can change the persisted
+        // subset — a burst of over-cap bodies costs zero disk I/O (#57/#58 verify:
+        // write-amplification advisory). Trade-off accepted: an eviction caused by
+        // an over-cap body can leave already-evicted entries on disk until the next
+        // persistable write; on load they are just cache entries again (bounds
+        // re-applied, freshness still gated by revalidation) — harmless for a cache.
+        if size <= maxPersistEntryBytes { saveIfPersistent() }
     }
 
     // ── disk persistence (#58) ─────────────────────────────────────────────────
@@ -122,8 +132,17 @@ public actor ETagCacheStore {
         guard let data = try? JSONEncoder().encode(DiskFile(version: 1, entries: entries)) else { return }
         let dir = url.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try? data.write(to: url, options: .atomic)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        // Create the temp file WITH 0600 and rename(2) it into place — permissions
+        // travel with the inode, so there is never a world-readable window (#58
+        // verify: the old write-then-chmod left a brief 0644 gap). rename is atomic
+        // and replaces the destination (including a pre-planted symlink at the
+        // final path — it is replaced, never written through).
+        let tmpPath = url.path + ".tmp"
+        guard FileManager.default.createFile(atPath: tmpPath, contents: data,
+                                             attributes: [.posixPermissions: 0o600]) else { return }
+        if rename(tmpPath, url.path) != 0 {
+            try? FileManager.default.removeItem(atPath: tmpPath)   // best-effort cleanup
+        }
     }
 
     /// Move a URL to the most-recently-used end of the order.
