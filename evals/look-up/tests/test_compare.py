@@ -223,6 +223,57 @@ def test_replace_readme_block_requires_exactly_one():
         replace_readme_block("no sentinels at all", "NEW")
 
 
+def test_staleness_days_pure():
+    # #49: pure date math with an INJECTED today — a wall-clock test would itself become
+    # the time bomb this feature exists to catch. Validates captured_at via the same
+    # ISO-calendar round-trip as the README guard.
+    import datetime
+    import pytest
+    from compare_context7 import staleness_days
+    assert staleness_days("2026-07-02", datetime.date(2026, 7, 5)) == 3
+    assert staleness_days("2026-07-02", datetime.date(2026, 7, 2)) == 0
+    with pytest.raises(ValueError):
+        staleness_days("not-a-date", datetime.date(2026, 7, 5))
+
+
+def test_check_staleness_fresh_via_main():
+    # Drive the real CLI: within budget → exit 0. `--today` injected so the test never
+    # reads the wall clock (sample captured_at = 2026-07-02).
+    from compare_context7 import main
+    assert main(["--check-staleness", "--max-age-days", "120", "--today", "2026-07-10"]) == 0
+
+
+def test_check_staleness_over_budget_via_main():
+    # Over budget → exit 1 (fail-loud): the front-page claim has rotted into an
+    # asserted number and the scheduled run must go red.
+    from compare_context7 import main
+    assert main(["--check-staleness", "--max-age-days", "120", "--today", "2027-07-10"]) == 1
+
+
+def test_check_staleness_boundary_future_and_bad_today():
+    # Boundary: age == budget is still WITHIN (fail only when age > budget);
+    # 2026-07-02 + 120d = 2026-10-30. A captured_at in the FUTURE of today is a
+    # clock/snapshot error → loud 1, never silently "fresh". Malformed --today → 1.
+    from compare_context7 import main
+    assert main(["--check-staleness", "--max-age-days", "120", "--today", "2026-10-30"]) == 0
+    assert main(["--check-staleness", "--max-age-days", "120", "--today", "2026-10-31"]) == 1
+    assert main(["--check-staleness", "--today", "2026-07-01"]) == 1   # captured_at in the future
+    assert main(["--check-staleness", "--today", "99-99-99"]) == 1     # malformed today
+
+
+def test_verify_live_exit_codes(monkeypatch):
+    # #49: --verify-live must FAIL LOUD (exit 1) when the registry has moved past the
+    # recorded ground truth — a scheduled run that only prints warnings to a log nobody
+    # reads is not a signal. Registry stubbed (no network in unit tests).
+    import oracle
+    from compare_context7 import main, load_sample
+    truths = {r["library"]: r["ground_truth"] for r in load_sample()["results"]}
+    monkeypatch.setattr(oracle, "fetch_latest_version", lambda lib, eco: truths[lib])
+    assert main(["--verify-live"]) == 0                     # registry == recorded → green
+    monkeypatch.setattr(oracle, "fetch_latest_version", lambda lib, eco: "999.0.0")
+    assert main(["--verify-live"]) == 1                     # drifted → red
+
+
 def test_sample_covers_corpus():
     # compare_corpus.yaml is the canonical library list; the recorded sample must
     # cover every one of them (so adding a lib to the corpus without recording its

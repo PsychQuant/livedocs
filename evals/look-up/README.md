@@ -104,7 +104,8 @@ registry as neutral ground truth.
 ```bash
 python3 evals/look-up/compare_context7.py            # print the table + tally
 python3 evals/look-up/compare_context7.py --json     # machine-readable
-python3 evals/look-up/compare_context7.py --verify-live   # warn if the snapshot drifted
+python3 evals/look-up/compare_context7.py --verify-live       # exit 1 if the registry moved past the snapshot
+python3 evals/look-up/compare_context7.py --check-staleness   # exit 1 if captured_at is over the age budget (120d)
 ```
 
 - Corpus: [`compare_corpus.yaml`](compare_corpus.yaml) — fast-moving libraries across
@@ -135,9 +136,9 @@ harness lets the data show it and **concedes** what context7 is good at:
   answer, not "context7 can't find the version." Per library the default is either
   *behind* (react, vite) or *version-less* (fastapi, pydantic, tokio, serde) — the
   sample records which.
-- **`--verify-live` is one-sided:** it re-fetches the registry (LiveDocs' side) and warns
-  on drift, but does not re-query context7. The context7 column is a dated snapshot;
-  refresh it by re-running both MCP tools.
+- **`--verify-live` is one-sided:** it re-fetches the registry (LiveDocs' side) and exits
+  non-zero on drift (#49), but does not re-query context7. The context7 column is a dated
+  snapshot; refresh it by re-running both MCP tools.
 - **D1 (this harness):** a dated recorded head-to-head. **D2 (future, not built):**
   a fully-automated live A/B that shells `claude -p` per tool — stronger but
   costly/flaky, so it stays out of the default path.
@@ -145,6 +146,31 @@ harness lets the data show it and **concedes** what context7 is good at:
 Result at capture (2026-07-02): context7's top-ranked default match reflected the current
 release on **0 of 6** (behind for react/vite, version-less for fastapi/pydantic/tokio/serde);
 LiveDocs returned the live registry version each time.
+
+### Refreshing the snapshot (#49)
+
+The front-page claim is only as honest as the snapshot's `captured_at`. Two mechanical
+signals tell you it's time (both run monthly by `.github/workflows/freshness.yml`, and
+either can be run by hand):
+
+- `--verify-live` exits 1 → the registry has moved past a recorded `ground_truth`;
+- `--check-staleness` exits 1 → `captured_at` is over the age budget (default 120 days,
+  tunable via `--max-age-days`).
+
+Refresh procedure (deliberately a **human** act — context7's column is a recorded
+judgment, not queryable):
+
+1. Re-run both MCP tools per library in `compare_corpus.yaml`: LiveDocs `latest_version`,
+   and context7's resolve→query flow; judge whether context7's **top-ranked default**
+   match reflects the current release.
+2. Update `compare_context7_sample.json`: `ground_truth` + `livedocs.answer` verbatim,
+   `context7.answer`/`is_current`/`default_version`/`default_status` per the new
+   judgment, and bump `captured_at` to today.
+3. Regenerate the committed artifacts:
+   `python3 evals/look-up/compare_context7.py --emit-chart --write` then
+   `--emit-readme --write`.
+4. `python3 -m pytest evals/look-up/tests/` — the drift guards confirm README ⟷ sample
+   ⟷ SVG are in sync again; commit sample + SVG + README together.
 
 ## Scope / caveats
 

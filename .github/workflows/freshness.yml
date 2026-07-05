@@ -1,0 +1,37 @@
+# vs-context7 snapshot freshness (#49): the PR-gate guards (ci.yml) lock README ⟷ sample,
+# but nothing there checks sample ⟷ REALITY. This scheduled run is that reality check:
+#   1. --verify-live   — re-fetches the registry ground truth (LiveDocs' side; network)
+#                        and exits 1 if any recorded version has drifted;
+#   2. --check-staleness — exits 1 when captured_at exceeds the age budget (default 120d).
+# Deliberately NOT part of PR CI: a time/network-based failure must never redden PRs
+# unrelated to the chart. A red run here is the maintainer's refresh signal — procedure
+# in evals/look-up/README.md § Refreshing the snapshot. context7's side is a recorded
+# human judgment and structurally cannot be auto-re-verified (stated in the README).
+#
+# Injection surface: no ${{ }} expressions — static commands + stock actions only.
+name: vs-context7 freshness
+
+on:
+  schedule:
+    - cron: "17 3 1 * *"   # monthly, 1st @ 03:17 UTC (off-peak, non-round minute)
+  workflow_dispatch:
+
+jobs:
+  freshness:
+    name: snapshot reality check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install eval-harness dependencies
+        run: pip install -r evals/look-up/requirements.txt
+
+      - name: Registry drift check (LiveDocs-side ground truth)
+        run: python3 evals/look-up/compare_context7.py --verify-live
+
+      - name: Staleness budget (captured_at age)
+        run: python3 evals/look-up/compare_context7.py --check-staleness
