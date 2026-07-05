@@ -61,8 +61,9 @@ python3 -m pytest evals/look-up/tests/  # 66 個 Python eval test
 ## CI 與 release gate
 
 - **CI** 每個 push / PR 跑 `swift build` + `swift test` **加上 Python unit suite**(#48)。
-  Python job 不碰網路 / API;它讓 vs-context7 漂移守衛(README 區塊 + 圖的 matplotlib
-  版本無關語意守衛)在 PR gate **機械性**觸發。byte-level `--emit-chart --check` 留在
+  Python job 不碰網路 / API;它讓 vs-context7 漂移守衛(README 區塊 + 圖的**座標無關**
+  語意守衛 —— 比對 `<text>` 內容,若未來 matplotlib 改變文字序列化只會**大聲 false-FAIL**、
+  絕不靜默通過)在 PR gate **機械性**觸發。byte-level `--emit-chart --check` 留在
   maintainer 本機(跨 matplotlib 版本 freetype-fragile)。
 - **`scripts/release.sh`** 把 release gate 在:`swift test` 綠、版本 source 與 tag 相符、
   Developer ID 簽章 + notarize。
