@@ -37,7 +37,11 @@ footnote.
    about ten releases behind — and its *top-ranked* match carried no version at all. Numbers
    rot (this line once said `0.138.2`); the harness is the living source — re-run
    `evals/look-up/compare_context7.py` for today's.
-2. Private, no key. Queries never leave your machine. No account, no API key, no hosted quota.
+2. Private and free, by construction. Queries never leave your machine — there is no vendor
+   backend to trust, meter, or breach. No account, no API key, no seat, no per-token fee for
+   private repos. Matching that vendor-free posture on context7 means self-hosting, which is a
+   paid tier. (context7 is SOC-2-certified and *offers* self-host — the edge is structural
+   absence, not that context7 is unsafe; see the head-to-head.)
 3. Raw and installed. Returns verbatim primary text, and can read the version you actually
    have. context7 returns ranked, model-summarized snippets, often weeks old.
 
@@ -48,15 +52,32 @@ footnote.
 | Freshness | live, direct-to-source, ETag-revalidated | periodically recrawled, so it lags |
 | Fidelity | raw verbatim reachable | ranked, model-summarized snippets |
 | Your environment | matched to the installed version | version-agnostic snapshot |
-| Architecture | local tool, no backend | centralized hosted service |
-| Privacy | queries stay on your machine | queries hit their servers |
-| Access | no account, no API key | hosted (quota / keys) |
+| Architecture | local tool, no vendor backend | hosted SaaS by default (self-host is a paid tier) |
+| Privacy | queries never leave your machine | default routes through their cloud (local processing + SOC-2 claimed) |
+| Cost | free, unmetered; private repos included | metered free tier (public only) + paid Pro / Enterprise |
 | Breadth | ~any public lib via generic discovery + adapters | large pre-indexed corpus |
 
 The Freshness row is measured, not asserted: the
 [vs-context7 harness](../evals/look-up/README.md#vs-context7-comparison-issue-27)
 (dated capture + per-library data, honesty caveats inline) is the living source of the
 head-to-head numbers — cite it rather than copying figures into prose that will rot.
+
+The Architecture / Privacy / Cost rows are cited from context7's own pages, with the
+concessions inline (measured-not-asserted applies to every competitive axis, not just
+freshness). Both are **structural** claims, not measured metrics — so the honesty mechanism
+is dated citation + concession, not a drift-guarded number:
+
+- **Vendor / privacy.** context7's default is a managed cloud service ("Built by Upstash"; a
+  dedicated hosted database per organization). It *offers* self-hosted / on-premise, claims
+  local query processing, and is SOC-2 Type II certified. LiveDocs has no vendor server at all
+  — nothing to deploy, trust, or breach. The edge is *structural absence*, not that context7 is
+  insecure; note that vendor-free operation on context7 is itself the paid self-host tier.
+- **Cost** (dated capture, context7 pricing 2026-07-05): Free = 1,000 calls/mo, public repos
+  only; Pro = $10/seat/mo, with private-repo parsing billed at $25 / 1M tokens; Enterprise =
+  custom. LiveDocs is unmetered because it never calls a metered API — it reads your sources
+  locally, private repos included, at no cost. Figures rot; the durable claim is the *structure*
+  (metered SaaS vs unmetered local), so cite the structure and date any figure. context7's free
+  tier is real, and its pre-indexed breadth is its home turf (conceded above).
 
 ## Honest reality: positioning ≠ winning
 
