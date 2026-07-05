@@ -104,7 +104,7 @@ than hardcoding a fact), and it's statistical (N runs, rate thresholds).
 
 ```bash
 pip install -r evals/look-up/requirements.txt
-python3 -m pytest evals/look-up/tests/     # 66 harness unit tests (no API calls)
+python3 -m pytest evals/look-up/tests/     # 71 harness unit tests (no API calls)
 python3 evals/look-up/run_eval.py --dry-run
 python3 evals/look-up/run_eval.py --runs 5 # live baseline (real `claude -p` calls)
 ```
@@ -119,7 +119,7 @@ python3 evals/look-up/compare_context7.py --verify-live  # warn if the snapshot 
 
 See [`evals/look-up/README.md`](evals/look-up/README.md) for the design of both, and
 the [Testing wiki page](https://github.com/PsychQuant/livedocs/wiki/Testing) for the full
-suite breakdown (210 tests: 144 Swift + 66 Python).
+suite breakdown (215 tests: 144 Swift + 71 Python).
 
 Status: shipped (v0.8.0; engine features below shipped v0.7.0, the skill's `look-up` rename +
 explicit invocation landed in v0.8.0). 9-ecosystem registry resolution, version pinning (npm/pypi/crates/go/rubygems), OpenAPI/GraphQL/CLI +
