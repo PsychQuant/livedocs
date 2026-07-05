@@ -92,8 +92,9 @@ swift test     # unit tests (pure logic + engine via injected HTTP fakes)
 swift build    # builds the MCP executable
 ```
 
-CI runs `swift build` + `swift test` on every push/PR. `scripts/release.sh` gates the release on a
-green `swift test`, a version-source match against the tag, and Developer ID signing + notarization.
+CI runs `swift build` + `swift test` and the Python unit suite on every push/PR (#48).
+`scripts/release.sh` gates the release on a green `swift test`, a version-source match
+against the tag, and Developer ID signing + notarization.
 
 ### Skill eval (`evals/look-up/`)
 

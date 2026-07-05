@@ -9,6 +9,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege (#48 verify): neither job uses the token — pip install + pytest
+# execute PR-influenced code, so don't hand them a write-scoped GITHUB_TOKEN.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: swift test
@@ -33,3 +38,35 @@ jobs:
 
       - name: Test
         run: swift test
+
+  # Python unit suite (#48): no network, no `claude -p` — safe on the PR critical path.
+  # This is what makes the front-page vs-context7 guards fire MECHANICALLY at the PR
+  # gate: the README-block drift guard (test_emit_readme_block_matches_committed_readme,
+  # + the `--emit-readme --check` CLI path) and the chart's SEMANTIC guard
+  # (test_committed_svg_is_semantically_faithful — it re-renders in THIS env and
+  # compares <text> content, not bytes/coordinates, so it is COORDINATE-independent;
+  # a future matplotlib changing text *serialization* would false-FAIL loudly, never
+  # silently pass — regenerate the asset to fix; requirements.txt caps matplotlib <4).
+  # Deliberately NOT run here: `--emit-chart --check` (byte-compare — false-drifts
+  # across matplotlib/freetype versions; #50 verify) and the LIVE eval
+  # (run_eval.py — real `claude -p` calls; stays periodic/manual per project policy).
+  # Guard scope (#48 verify): these guards lock rendered artifacts ⟷ snapshot.
+  # Snapshot-SOURCE tampering is caught by freshness.yml's pull_request paths trigger
+  # (live registry check on any PR touching the sample), and the wiki Home numbers by
+  # test_home_pages_match_sample — both landed via #49 (same batch).
+  python-tests:
+    name: python unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install eval-harness dependencies
+        run: pip install -r evals/look-up/requirements.txt
+
+      - name: Run unit tests (incl. vs-context7 drift guards)
+        run: python3 -m pytest evals/look-up/tests/ -q

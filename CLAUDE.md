@@ -25,8 +25,10 @@ make release-signed VERSION=vX.Y.Z           # build + sign + notarize + mcpb (n
 bash scripts/sync-wiki.sh                    # mirror docs/wiki/ -> GitHub wiki (after merge)
 ```
 
-CI runs `swift build` + `swift test` per push/PR. `scripts/release.sh` gates on green tests +
-version-source/tag match. Version source of truth: `Sources/LiveDocsCore/Version.swift`.
+CI runs `swift build` + `swift test` AND the Python unit suite per push/PR (the Python job
+is what fires the vs-context7 drift guards mechanically at the PR gate, #48 — it makes no
+network / API calls). `scripts/release.sh` gates on green tests + version-source/tag match.
+Version source of truth: `Sources/LiveDocsCore/Version.swift`.
 Live evals (`run_eval.py --runs N`) are periodic/manual — real `claude -p` calls; run from a
 clean non-nested directory with credits.
 
