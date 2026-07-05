@@ -14,11 +14,12 @@ The pain: always-latest, straight from the source, with no periodically-recrawle
 sitting in between.
 
 Why that holds and is hard to copy: LiveDocs runs locally and goes direct to the source.
-That is also why it is private and needs no API key. context7 is a centralized service;
-it can't become local, private, and keyless without giving up its model.
+That is also why there is no third-party doc index in the query path and no API key.
+context7 is a centralized SaaS by default; matching that locally and keylessly means its
+Enterprise self-host tier — i.e. leaving the default model.
 
-Lead with the outcome (latest, private, keyless). "Decentralized" is the mechanism behind
-that outcome, not the headline.
+Lead with the outcome (latest, keyless, no index in the middle). "Decentralized" is the
+mechanism behind that outcome, not the headline.
 
 ## The sharpest angle: "the docs your code actually runs on"
 
@@ -74,8 +75,8 @@ is dated citation + concession, not a drift-guarded number:
 - **Vendor / privacy.** context7's default is a managed cloud service ("Built by Upstash"; a
   dedicated *private* database per organization). It *offers* self-hosted / on-premise (its
   custom-priced Enterprise tier), is SOC-2 Type II certified, and claims queries are "processed
-  locally." Read that claim precisely: even client-side processing still sends the *index lookup*
-  to context7's hosted per-org database — that hosted index is exactly what LiveDocs structurally
+  locally." Read that claim precisely: a hosted SaaS with a per-org database must still route the
+  *index lookup* to that hosted database — that hosted index is exactly what LiveDocs structurally
   lacks. LiveDocs has no service on the query path to breach. But be symmetric about the trust
   surface — it doesn't disappear, it *moves*: to the local signed binary and its distribution
   channel (a compromised release or signing key is its own, arguably larger, blast radius), and
