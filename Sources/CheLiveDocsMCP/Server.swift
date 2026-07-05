@@ -54,14 +54,16 @@ final class CheLiveDocsMCPServer {
         return [
             Tool(
                 name: "resolve_source",
-                description: "Discover the best PRIMARY documentation source(s) for a library, freshest+highest-fidelity first. Tries llms.txt → package registry → repo. Returns ranked JSON {kind,url,fidelity,freshness,version}. Empty result means no primary source found — fall back to context7/web and label it low-fidelity. Provide library (+ecosystem) and/or an explicit docs_url.",
+                description: "Discover the best PRIMARY documentation source(s) for a library, freshest+highest-fidelity first. Tries llms.txt → package registry → repo. Returns ranked JSON {kind,url,fidelity,freshness,version}. Pass fetch_top:true to ALSO get the top result's raw content in the same call (one round-trip instead of resolve→fetch_docs; on a fetch miss the ranked list still returns — descend it with fetch_docs). Empty result means no primary source found — fall back to context7/web and label it low-fidelity. Provide library (+ecosystem) and/or an explicit docs_url.",
                 inputSchema: .object([
                     "type": .string("object"),
                     "properties": .object([
                         "library": .object(["type": .string("string"), "description": .string("Package name, e.g. react, fastapi")]),
                         "ecosystem": ecosystemEnum,
                         "version": versionProp,
-                        "docs_url": .object(["type": .string("string"), "description": .string("Explicit docs host/URL to probe for llms.txt, e.g. https://hono.dev")])
+                        "docs_url": .object(["type": .string("string"), "description": .string("Explicit docs host/URL to probe for llms.txt, e.g. https://hono.dev")]),
+                        "fetch_top": .object(["type": .string("boolean"), "description": .string("Also fetch the top-ranked source's raw content in this same call (#59) — saves the second round-trip for docs/config questions. Sanitized + truncated like fetch_docs.")]),
+                        "max_bytes": .object(["type": .string("integer"), "description": .string("With fetch_top: truncation cap for the fetched content (default 200000)")])
                     ])
                 ])
             ),
@@ -139,6 +141,18 @@ final class CheLiveDocsMCPServer {
                 docsURL: args["docs_url"]?.stringValue,
                 version: args["version"]?.stringValue
             )
+            // Composite one-call path (#59): resolve + fetch the top result together,
+            // saving the agent a whole round-trip. Content goes through the SAME
+            // sanitize/truncate pipeline as fetch_docs — never a second, laxer path.
+            if args["fetch_top"]?.boolValue == true {
+                let (sources, topRaw) = await engine.resolveSourcesFetchingTop(req)
+                if sources.isEmpty {
+                    return #"{"sources":[],"note":"No primary source found. Fall back to context7/web and label it LOW fidelity."}"#
+                }
+                let cap = max(0, args["max_bytes"]?.intValue ?? 200_000)
+                let content = topRaw.map { TextSanitize.truncateUTF8(TextSanitize.forModel($0), maxBytes: cap) }
+                return encodeSourcesWithTop(sources, topContent: content)
+            }
             let sources = await engine.resolveSources(req)
             if sources.isEmpty {
                 return #"{"sources":[],"note":"No primary source found. Fall back to context7/web and label it LOW fidelity."}"#
@@ -213,8 +227,8 @@ final class CheLiveDocsMCPServer {
 
     // MARK: - JSON encoding (hand-rolled to keep LiveDocsCore free of an encoding policy)
 
-    private func encodeSources(_ sources: [DiscoverySource]) -> String {
-        let arr: [[String: Any]] = sources.map {
+    private func sourcesArray(_ sources: [DiscoverySource]) -> [[String: Any]] {
+        sources.map {
             [
                 "kind": $0.kind.rawValue,
                 "url": $0.url,
@@ -224,7 +238,30 @@ final class CheLiveDocsMCPServer {
                 "title": $0.title as Any
             ]
         }
-        return jsonString(["sources": arr])
+    }
+
+    private func encodeSources(_ sources: [DiscoverySource]) -> String {
+        jsonString(["sources": sourcesArray(sources)])
+    }
+
+    /// Composite response for `resolve_source{fetch_top:true}` (#59): the ranked
+    /// list PLUS the top result's (sanitized, truncated) content in one payload.
+    /// On a top-fetch miss the list still ships with an explicit note — the agent
+    /// descends it with fetch_docs; never a silent empty. The top source's title
+    /// rides along so a pinned request's "NOT pinned" label stays attached to the
+    /// content it describes. Internal (not private) for boundary tests.
+    func encodeSourcesWithTop(_ sources: [DiscoverySource], topContent: String?) -> String {
+        var obj: [String: Any] = ["sources": sourcesArray(sources)]
+        if let content = topContent, let top = sources.first {
+            obj["top_content"] = [
+                "url": top.url,
+                "title": top.title as Any,
+                "content": content
+            ] as [String: Any]
+        } else {
+            obj["note"] = "top_content unavailable (fetch failed) — descend sources with fetch_docs"
+        }
+        return jsonString(obj)
     }
 
     private func encodeResolution(_ r: RegistryResolution, note: String? = nil) -> String {

@@ -89,15 +89,17 @@ never installs).
    |---|---|
    | "what's the latest version / did X change / what's new" | `latest_version` (exact version + changelog URL) |
    | a **specific version** (e.g. React 18 vs 19) | any of the below + `version:"18.3.1"` (honored for npm/pypi/crates/go/rubygems — see `latest_version`'s `pin_honored`; llms.txt/repo URLs are always latest and get labeled) |
-   | how to use / configure / general docs | `resolve_source` → then `fetch_docs` on the top result |
+   | how to use / configure / general docs | `resolve_source{..., fetch_top:true}` — ranked list + the top result's raw content in ONE call. On a `top_content` miss (note in the response), descend the list with `fetch_docs` |
    | exact API surface — endpoints, request/response shape | `introspect` (kind=openapi or graphql) |
    | a CLI's flags / subcommands / installed version | `introspect` (kind=cli, target = bare command) |
 
-3. **`resolve_source` → `fetch_docs`**: `resolve_source` returns ranked sources
-   `{kind,url,fidelity,freshness,version}`. Take the **top** (highest fidelity)
-   and `fetch_docs` its `url` for the verbatim text. For exactness-critical
-   answers (config keys, API signatures) always fetch **raw** rather than
-   paraphrasing a snippet.
+3. **One call, not two**: `resolve_source{fetch_top:true}` returns the ranked
+   sources `{kind,url,fidelity,freshness,version}` AND the top result's verbatim
+   content (`top_content`) in the same call — prefer it for docs/config questions
+   (saves a whole round-trip). If `top_content` is missing (the response says so
+   explicitly), descend the ranked list with `fetch_docs` on the next `url`. For
+   exactness-critical answers (config keys, API signatures) always use the **raw**
+   content rather than paraphrasing a snippet.
 
 4. **When there's no primary source.** If `resolve_source` returns `{"sources":[]}`,
    LiveDocs found no live primary source. Prefer another *dynamic* route first

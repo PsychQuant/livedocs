@@ -244,6 +244,30 @@ final class EngineTests: XCTestCase {
         let fullFetches = await http.requested.filter { $0 == "https://hono.dev/llms-full.txt" }.count
         XCTAssertEqual(fullFetches, 1, "sibling absorbed from collected results, not re-probed")
     }
+
+    // ── #59: composite resolve+fetch-top in one call ──────────────────────────
+
+    func testResolveFetchingTopReturnsSourcesAndTopContent() async {
+        // One call yields the ranked list AND the top source's raw body — the
+        // round-trip the two-step resolve→fetch used to cost (#59).
+        let http = FakeHTTP(routes: [
+            "https://hono.dev/llms.txt": textPlain(5_000),
+            "https://hono.dev/llms-full.txt": textPlain(40_000),
+        ])
+        let (sources, top) = await DiscoveryEngine(http: http)
+            .resolveSourcesFetchingTop(.init(docsURL: "https://hono.dev"))
+        XCTAssertEqual(sources.first?.kind, .llmsFull)
+        XCTAssertEqual(top?.count, 40_000, "top content is the top-ranked source's body, verbatim")
+    }
+
+    func testResolveFetchingTopEmptyResolveYieldsNilContent() async {
+        // Nothing resolves → no fetch attempted, content nil, sources empty —
+        // graceful degradation, never an error for the have-nothing case.
+        let (sources, top) = await DiscoveryEngine(http: FakeHTTP(routes: [:]))
+            .resolveSourcesFetchingTop(.init(docsURL: "https://nothing.example"))
+        XCTAssertTrue(sources.isEmpty)
+        XCTAssertNil(top)
+    }
 }
 
 /// Concurrency-safe recording fake: an actor, so concurrent TaskGroup probes (#57)

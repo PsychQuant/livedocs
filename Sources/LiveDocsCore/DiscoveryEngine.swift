@@ -135,6 +135,20 @@ public struct DiscoveryEngine: Sendable {
         try await http.get(url).bodyText
     }
 
+    /// Resolve AND fetch the top result's raw content in ONE call (#59) — removes a
+    /// whole agent round-trip vs the resolve→fetch two-step, at zero extra process
+    /// cost (the measured alternative — a spawned cheap-model subagent — loses
+    /// ~7–30× on spawn overhead; see evals/look-up/perf_profile.md). Exact parity
+    /// with the two-call flow: the fetch goes through the same HTTP client (SSRF
+    /// guard included), and a fetch failure degrades gracefully — sources intact,
+    /// content nil, the caller descends the list with fetch_docs.
+    public func resolveSourcesFetchingTop(_ req: DiscoveryRequest) async
+        -> (sources: [DiscoverySource], topContent: String?) {
+        let sources = await resolveSources(req)
+        guard let top = sources.first else { return (sources, nil) }
+        return (sources, try? await fetchRaw(url: top.url))
+    }
+
     /// The deterministic "what is the latest version right now" answer, plus the
     /// changelog/repo URLs the registry hands over. Public because it's a useful
     /// tool on its own, not just an internal leg of `resolveSources`.
