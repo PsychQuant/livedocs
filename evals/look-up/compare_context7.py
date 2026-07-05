@@ -14,9 +14,10 @@ fetcher and a pre-built index are trying to reflect).
   than brittle-parsing prose.
 
 Honesty guard (see README): this measures freshness only. context7 legitimately
-wins on doc/snippet breadth, and often *has* the current version in a lower-ranked
-entry — conceded explicitly. We do not measure coverage (a pre-built index's home
-turf). If a run shows context7 current for some library, it is reported as such.
+wins on doc/snippet breadth, and *can* have the current version in a lower-ranked
+entry (as with react in the sample — the other five do not) — conceded explicitly.
+We do not measure coverage (a pre-built index's home turf). If a run shows context7
+current for some library, it is reported as such.
 
 The comparison data is a dated snapshot in compare_context7_sample.json,
 reproducible by re-running both MCP tools by hand (procedure in README). Pass
@@ -159,48 +160,38 @@ def _require_iso_date(value):
         )
 
 
-def render_bar_chart(t, captured_at, width=26):
-    """Unicode bar chart of latest-version freshness over the *contested* set.
+CHART_ASSET = "docs/assets/vs-context7-freshness.svg"
 
-    Pure: takes the tally() dict (n / livedocs_current / context7_current) + a
-    capture date, returns a plain-text block. Bar length is proportional to
-    count/n, so the visual can never contradict the number it labels. The honesty
-    caveat is part of the returned block — it cannot be separated from the chart.
-    """
-    n = t["n"]
 
-    def bar(count):
-        filled = round(width * count / n) if n else 0
-        filled = max(0, min(filled, width))   # defensive: a malformed tally can't overflow the bar
-        return "█" * filled + "░" * (width - filled)
-
-    lo, c7 = t["livedocs_current"], t["context7_current"]
-    return "\n".join([
-        f"latest-version freshness · contested set ({n} fast-moving libs) · captured {captured_at}",
-        f"  LiveDocs  {bar(lo)}  {lo}/{n}",
-        f"  context7  {bar(c7)}  {c7}/{n}",
-        "  freshness only · context7 wins coverage · LiveDocs current by construction · measured, not asserted",
-    ])
+def chart_asset_path():
+    """Absolute path to the committed SVG chart asset (repo-root relative)."""
+    return os.path.abspath(os.path.join(HERE, "..", "..", *CHART_ASSET.split("/")))
 
 
 def render_readme_block(rows, captured_at):
-    """The full sentinel-delimited README section: the bar chart in a fenced code
-    block + a one-line pointer to the harness. Reuses tally() so the chart and the
-    CLI summary can never disagree.
+    """The sentinel-delimited README section (issue #50): the per-library matplotlib
+    SVG embedded as an image + a VISIBLE caption carrying the honesty caveats and the
+    capture date. The competitive numbers live IN the SVG (drift-guarded by chart.py's
+    version-token test); this block guards the caption / date / embed path.
 
-    Refuses to emit unless captured_at is a bare ISO date — a competitive claim on the
-    front page must carry a real date, and this also blocks a crafted snapshot from
-    injecting markup / a stray END sentinel into the block (#46 verify)."""
+    Refuses to emit unless captured_at is a bare ISO date — a front-page competitive
+    claim must carry a real date, and this blocks a crafted snapshot from injecting
+    markup into the caption (#46 verify)."""
     _require_iso_date(captured_at)
-    chart = render_bar_chart(tally(rows), captured_at)
+    t = tally(rows)
+    lc, cc, n = t["livedocs_current"], t["context7_current"], t["n"]
+    alt = (f"Per-library latest-version freshness on {n} fast-moving libraries: "
+           f"LiveDocs returns the current release on {lc}/{n}; context7's default match on {cc}/{n} "
+           f"(freshness only, context7 wins on coverage).")
     return "\n".join([
         README_BEGIN,
-        "```text",
-        chart,
-        "```",
-        "_Measured by `evals/look-up/compare_context7.py` from a dated snapshot — "
-        "freshness only, on deliberately fast-moving libs; context7 wins on coverage. "
-        "Regenerate: `python3 evals/look-up/compare_context7.py --emit-readme --write`._",
+        f"![{alt}]({CHART_ASSET})",
+        "",
+        f"_**Latest-version freshness**, {n} fast-moving libraries · captured {captured_at} · "
+        "**measured, not asserted**: freshness of the *default match* only — context7 wins on doc coverage "
+        "and can carry the current version in a lower-ranked entry (as with react here; both conceded, not measured), "
+        "the libraries are forward-selected fast-movers, and LiveDocs is the registry by construction. "
+        "Data + method: [`evals/look-up`](https://github.com/PsychQuant/livedocs/tree/main/evals/look-up)._",
         README_END,
     ])
 
@@ -251,22 +242,50 @@ def main(argv=None):
     ap.add_argument("--verify-live", action="store_true",
                     help="re-fetch registry ground truth and warn if the recorded snapshot drifted")
     ap.add_argument("--emit-readme", action="store_true",
-                    help="emit the README vs-context7 block (bar chart); compose with --write / --check")
+                    help="emit the README vs-context7 block (SVG image embed + caption); compose with --write / --check")
+    ap.add_argument("--emit-chart", action="store_true",
+                    help="emit the per-library SVG chart asset (issue #50); compose with --write / --check")
     mode = ap.add_mutually_exclusive_group()
     mode.add_argument("--write", action="store_true",
-                      help="with --emit-readme: rewrite the sentinel-marked block in README.md in place")
+                      help="with --emit-readme / --emit-chart: rewrite the target file in place")
     mode.add_argument("--check", action="store_true",
-                      help="with --emit-readme: exit 1 if README's block drifted from the snapshot (fail-loud guard)")
+                      help="with --emit-readme / --emit-chart: exit 1 if the committed artifact drifted (fail-loud guard)")
     args = ap.parse_args(argv)
 
-    # --write / --check are modifiers of --emit-readme; without it they silently
+    if args.emit_readme and args.emit_chart:
+        ap.error("--emit-readme and --emit-chart are separate artifacts; pass one at a time")
+    # --write / --check are modifiers of an --emit-* mode; alone they silently
     # no-op'd and a mis-invoked `--check` guard exited 0 (false pass, #46 verify).
-    if (args.check or args.write) and not args.emit_readme:
-        ap.error("--check / --write require --emit-readme")
+    if (args.check or args.write) and not (args.emit_readme or args.emit_chart):
+        ap.error("--check / --write require --emit-readme or --emit-chart")
 
     sample = load_sample(args.sample)
     results = sample.get("results", [])
     rows = [judge_row(e) for e in results]
+
+    if args.emit_chart:
+        from chart import render_svg
+        svg = render_svg(sample)
+        path = chart_asset_path()
+        if args.check:
+            if not os.path.exists(path):
+                print(f"✗ chart asset missing ({CHART_ASSET}) — run --emit-chart --write", file=sys.stderr)
+                return 1
+            with open(path, encoding="utf-8") as f:
+                committed = f.read()
+            if committed != svg:
+                print(f"✗ {CHART_ASSET} is stale — run: "
+                      "python3 evals/look-up/compare_context7.py --emit-chart --write", file=sys.stderr)
+                return 1
+            print(f"✓ {CHART_ASSET} in sync")
+            return 0
+        if args.write:
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            _atomic_write(path, svg)
+            print(f"✓ wrote {CHART_ASSET}")
+            return 0
+        sys.stdout.write(svg)
+        return 0
 
     if args.emit_readme:
         block = render_readme_block(rows, sample.get("captured_at"))
