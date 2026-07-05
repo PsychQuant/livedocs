@@ -2,3 +2,4 @@
 #   pip install -r evals/look-up/requirements.txt
 PyYAML>=6.0      # corpus.yaml parsing (run_eval.py)
 pytest>=7.0      # unit tests (tests/)
+matplotlib>=3.9  # per-library vs-context7 SVG chart (chart.py, #50)
