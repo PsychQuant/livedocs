@@ -11,7 +11,20 @@ final class CheLiveDocsMCPServer {
     private let engine: DiscoveryEngine
     private let tools: [Tool]
 
-    init(engine: DiscoveryEngine = DiscoveryEngine(http: ETagCachingHTTPClient(inner: URLSessionHTTPClient()))) {
+    /// Disk-persisted ETag cache (#58): the revalidation half of the warm win
+    /// survives restarts. LOCAL cache in the user's Caches dir (inside the
+    /// anti-positioning boundary — never shared/central); nil-safe fallback to
+    /// in-memory when no caches directory resolves. Semantics unchanged: every
+    /// request still revalidates with the origin.
+    private static func defaultCacheStore() -> ETagCacheStore {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+        let file = base?.appendingPathComponent("CheLiveDocsMCP/etag-cache.json")
+        return ETagCacheStore(persistURL: file)
+    }
+
+    init(engine: DiscoveryEngine = DiscoveryEngine(
+        http: ETagCachingHTTPClient(inner: URLSessionHTTPClient(),
+                                    store: CheLiveDocsMCPServer.defaultCacheStore()))) {
         self.engine = engine
         self.tools = Self.defineTools()
         self.server = Server(

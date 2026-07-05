@@ -1,9 +1,19 @@
 import Foundation
 
-/// Thread-safe per-process store of `ETag → last 200 response` keyed by URL.
-/// In-memory only: it speeds up repeated fetches within a running MCP session
-/// (a docs file probed then fetched, a registry hit re-queried) and is empty on
-/// restart. Persisting to disk is a possible follow-up.
+/// Thread-safe per-process store of `ETag → last 200 response` keyed by URL,
+/// with **opt-in disk persistence** (#58) so the revalidation half of the warm win
+/// survives MCP server restarts. Only entries with a body ≤ `maxPersistEntryBytes`
+/// (default 1 MB — sized to include registry JSONs like pypi's ~450 KB fastapi
+/// payload while excluding multi-MB `llms-full` dumps whose write cost would
+/// outweigh the value; measured in #58's acceptance run). The
+/// connection-setup share of a warm win is NOT recoverable by any cache — see
+/// evals/look-up/perf_profile.md.
+///
+/// Boundary note: this is a LOCAL cache on the user's machine, inside the
+/// docs/positioning.md anti-positioning line — the forbidden thing is a
+/// shared/central content cache, not local persistence. Semantics are unchanged:
+/// **always revalidate** (the persisted body is only served after the origin
+/// answers 304). Only already-validated 200 responses ever enter the store.
 ///
 /// **Bounded**: without eviction a long session that fetched many docs would keep
 /// every full body (a multi-MB `llms-full.txt` each) for the process lifetime. The
@@ -19,24 +29,33 @@ public actor ETagCacheStore {
     /// URLs in least-recently-used → most-recently-used order.
     private var lru: [String] = []
     private var totalBytes: Int = 0
+    private var loaded = false
 
     private let maxTotalBytes: Int
     private let maxEntries: Int
     private let maxEntryBytes: Int
+    private let maxPersistEntryBytes: Int
+    /// nil (the default) = in-memory only, byte-for-byte the pre-#58 behavior.
+    private let persistURL: URL?
 
-    public init(maxTotalBytes: Int = 50_000_000, maxEntries: Int = 256, maxEntryBytes: Int = 5_000_000) {
+    public init(maxTotalBytes: Int = 50_000_000, maxEntries: Int = 256, maxEntryBytes: Int = 5_000_000,
+                persistURL: URL? = nil, maxPersistEntryBytes: Int = 1_048_576) {
         self.maxTotalBytes = maxTotalBytes
         self.maxEntries = maxEntries
         self.maxEntryBytes = maxEntryBytes
+        self.persistURL = persistURL
+        self.maxPersistEntryBytes = maxPersistEntryBytes
     }
 
     func entry(for url: String) -> Entry? {
+        loadIfNeeded()
         guard let e = map[url] else { return nil }
         touch(url)
         return e
     }
 
     func set(url: String, etag: String, response: HTTPResponse) {
+        loadIfNeeded()
         let size = response.body.count
         // A body too large to be worth caching is served through but not stored —
         // one giant doc must not evict the whole working set or blow the budget.
@@ -46,6 +65,65 @@ public actor ETagCacheStore {
         totalBytes += size
         touch(url)
         evictIfNeeded()
+        saveIfPersistent()
+    }
+
+    // ── disk persistence (#58) ─────────────────────────────────────────────────
+
+    /// On-disk representation. Data encodes as base64 under Codable; a `version`
+    /// field lets a future format change invalidate old files cleanly.
+    private struct DiskFile: Codable {
+        var version: Int
+        var entries: [DiskEntry]
+    }
+    private struct DiskEntry: Codable {
+        var url: String
+        var etag: String
+        var status: Int
+        var contentType: String?
+        var body: Data
+        var responseEtag: String?
+    }
+
+    /// Lazy one-shot load. Corrupt / unreadable / wrong-version files start empty —
+    /// a cache must never crash its owner. Loaded entries pass through the normal
+    /// bounds (touch + evict) so a hand-grown file can't blow the budget.
+    private func loadIfNeeded() {
+        guard !loaded else { return }
+        loaded = true
+        guard let url = persistURL,
+              let data = try? Data(contentsOf: url),
+              let file = try? JSONDecoder().decode(DiskFile.self, from: data),
+              file.version == 1
+        else { return }
+        for e in file.entries {
+            let resp = HTTPResponse(status: e.status, contentType: e.contentType,
+                                    body: e.body, etag: e.responseEtag)
+            let size = resp.body.count
+            if size > maxEntryBytes { continue }
+            map[e.url] = Entry(etag: e.etag, response: resp)
+            totalBytes += size
+            touch(e.url)
+        }
+        evictIfNeeded()
+    }
+
+    /// Best-effort write-through of the small-body subset (≤ maxPersistEntryBytes).
+    /// Atomic write + owner-only permissions; failures are silent — persistence is
+    /// an optimization, never a correctness dependency.
+    private func saveIfPersistent() {
+        guard let url = persistURL else { return }
+        let entries: [DiskEntry] = lru.compactMap { key in
+            guard let e = map[key], e.response.body.count <= maxPersistEntryBytes else { return nil }
+            return DiskEntry(url: key, etag: e.etag, status: e.response.status,
+                             contentType: e.response.contentType,
+                             body: e.response.body, responseEtag: e.response.etag)
+        }
+        guard let data = try? JSONEncoder().encode(DiskFile(version: 1, entries: entries)) else { return }
+        let dir = url.deletingLastPathComponent()
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try? data.write(to: url, options: .atomic)
+        try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }
 
     /// Move a URL to the most-recently-used end of the order.
