@@ -37,11 +37,13 @@ footnote.
    about ten releases behind — and its *top-ranked* match carried no version at all. Numbers
    rot (this line once said `0.138.2`); the harness is the living source — re-run
    `evals/look-up/compare_context7.py` for today's.
-2. Private and free, by construction. Queries never leave your machine — there is no vendor
-   backend to trust, meter, or breach. No account, no API key, no seat, no per-token fee for
-   private repos. Matching that vendor-free posture on context7 means self-hosting, which is a
-   paid tier. (context7 is SOC-2-certified and *offers* self-host — the edge is structural
-   absence, not that context7 is unsafe; see the head-to-head.)
+2. Private and free, by construction. Your query goes straight to the authoritative source
+   (npm, PyPI, the docs host) with no third-party index in between to see, log, meter, or
+   breach it — and version reconciliation reads your locally-installed copy offline. There is
+   no LiveDocs vendor at all. No account, no API key, no seat, no per-token fee for private
+   repos. Matching that vendor-free posture on context7 means self-hosting, a paid tier.
+   (context7 is SOC-2-certified and *offers* self-host — the edge is structural absence, not
+   that context7 is unsafe; see the head-to-head.)
 3. Raw and installed. Returns verbatim primary text, and can read the version you actually
    have. context7 returns ranked, model-summarized snippets, often weeks old.
 
@@ -53,7 +55,7 @@ footnote.
 | Fidelity | raw verbatim reachable | ranked, model-summarized snippets |
 | Your environment | matched to the installed version | version-agnostic snapshot |
 | Architecture | local tool, no vendor backend | hosted SaaS by default (self-host is a paid tier) |
-| Privacy | queries never leave your machine | default routes through their cloud (local processing + SOC-2 claimed) |
+| Privacy | no third-party index sees your query (direct to source) | default routes through their cloud (local processing + SOC-2 claimed) |
 | Cost | free, unmetered; private repos included | metered free tier (public only) + paid Pro / Enterprise |
 | Breadth | ~any public lib via generic discovery + adapters | large pre-indexed corpus |
 
