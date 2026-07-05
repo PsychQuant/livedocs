@@ -192,6 +192,14 @@ judgment, not queryable):
    together. The staleness tests pin their own sample fixture, so a refresh never
    breaks them.
 
+## Performance profile (issue #56)
+
+A dated engine-latency capture + the measured verdict on subagent/cheap-model
+delegation lives in [`perf_profile.md`](perf_profile.md); reproduce with
+`python3 evals/look-up/profile_mcp.py` (speaks MCP stdio to the installed binary —
+engine-side timings, no agent loop). Same discipline as the vs-context7 snapshot:
+dated capture, directional, measured never asserted.
+
 ## Scope / caveats
 
 - Measures a **sample**, not a proof of universal correctness — the corpus must
