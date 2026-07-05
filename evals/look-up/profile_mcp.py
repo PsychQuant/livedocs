@@ -57,26 +57,45 @@ def call(p, i, name, args):
 def main():
     print(f"binary: {BIN}\n")
     # Process A: cold→warm within one server lifetime (in-memory ETag effect).
+    # ORDERING (#56 verify): each library's resolve_source runs FIRST in the process,
+    # before any other call touches its hosts — otherwise a prior latest_version call
+    # ETag-/connection-warms the registry leg and biases the "cold" resolve (the
+    # ordering bias the round-1 review caught in the original capture).
     p = start()
     for n, (label, name, args) in enumerate([
-        ("latest_version react (cold)",   "latest_version", {"library": "react", "ecosystem": "npm"}),
-        ("latest_version react (warm)",   "latest_version", {"library": "react", "ecosystem": "npm"}),
         ("resolve_source react (cold)",   "resolve_source", {"library": "react", "ecosystem": "npm"}),
         ("resolve_source react (warm)",   "resolve_source", {"library": "react", "ecosystem": "npm"}),
+        ("latest_version react (cold*)",  "latest_version", {"library": "react", "ecosystem": "npm"}),
+        ("latest_version react (warm)",   "latest_version", {"library": "react", "ecosystem": "npm"}),
         ("resolve_source fastapi (cold)", "resolve_source", {"library": "fastapi", "ecosystem": "pypi"}),
     ], start=1):
         dt, ok = call(p, n, name, args)
         print(f"{label:38} {dt * 1000:8.0f} ms  {'ok' if ok else 'ERROR'}")
+    print("  (* latest_version react runs after resolve_source warmed the registry —")
+    print("     within-process 'cold' only for the tool, not the connection/ETag)")
     p.terminate()
 
-    # Process B: fresh process — the restart penalty (ETag cache is per-process).
+    # Process B: fresh processes — the restart penalty (ETag cache is per-process).
+    # latest_version gets its own fresh process so ITS cold number carries no
+    # within-process warming from A.
     p2 = start()
-    dt, ok = call(p2, 1, "resolve_source", {"library": "react", "ecosystem": "npm"})
-    print(f"{'resolve_source react (fresh proc)':38} {dt * 1000:8.0f} ms  {'ok' if ok else 'ERROR'}")
-    dt, ok = call(p2, 2, "fetch_docs", {"url": "https://react.dev/llms.txt"})
+    dt, ok = call(p2, 1, "latest_version", {"library": "react", "ecosystem": "npm"})
+    print(f"{'latest_version react (fresh proc)':38} {dt * 1000:8.0f} ms  {'ok' if ok else 'ERROR'}")
+    dt, ok = call(p2, 2, "latest_version", {"library": "react", "ecosystem": "npm"})
+    print(f"{'latest_version react (warm)':38} {dt * 1000:8.0f} ms  {'ok' if ok else 'ERROR'}")
+    dt, ok = call(p2, 3, "resolve_source", {"library": "react", "ecosystem": "npm"})
+    print(f"{'resolve_source react (proc-warm)':38} {dt * 1000:8.0f} ms  {'ok' if ok else 'ERROR'}")
+    dt, ok = call(p2, 4, "fetch_docs", {"url": "https://react.dev/llms.txt"})
     print(f"{'fetch_docs react llms.txt':38} {dt * 1000:8.0f} ms  {'ok' if ok else 'ERROR'}")
     p2.terminate()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except FileNotFoundError:
+        print(f"binary not found: {BIN}\n"
+              f"pass the CheLiveDocsMCP path as argv[1], e.g.\n"
+              f"  python3 evals/look-up/profile_mcp.py ~/bin/CheLiveDocsMCP",
+              file=sys.stderr)
+        raise SystemExit(1)
