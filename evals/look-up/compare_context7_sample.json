@@ -3,7 +3,7 @@
   "axis": "latest-version freshness",
   "ground_truth_source": "package registry current version (npm / PyPI / crates)",
   "method": "For each library: LiveDocs `latest_version` (1 call) and context7 `resolve-library-id` (part of its resolve->query flow). `ground_truth` is the registry's current version at capture time. `livedocs.answer` is verbatim. `context7.answer` describes its TOP-RANKED (highest benchmark score) default match and the version that match reflects; `context7.is_current` is a human judgment of whether that default answer matches the current release. Reproduce by re-running both MCP tools.",
-  "honesty_note": "Freshness only. context7 is a coverage-ranked doc/snippet retriever, not a version API; it wins on doc breadth and frequently carries the current version in a lower-ranked entry (conceded per library below). We do not measure coverage.",
+  "honesty_note": "Freshness only. context7 is a coverage-ranked doc/snippet retriever, not a version API; it wins on doc breadth and CAN carry the current version in a lower-ranked entry (true for 1 of the 6 here — react; the other five have no current-version entry at all — conceded per library below). We do not measure coverage.",
   "results": [
     {
       "id": "react-npm",

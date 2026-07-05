@@ -65,16 +65,32 @@ def test_committed_svg_is_semantically_faithful():
     assert SAMPLE["captured_at"] in svg   # the dated claim
 
 
-def test_semantic_guard_catches_column_swap():
-    # Prove the guard catches what token-presence could not: swap react's two cells so
-    # the SVG lies (LiveDocs behind, context7 current). Every version token still
-    # PRESENT — only the positional/marker binding exposes the lie.
+def test_semantic_guard_catches_visual_lies():
+    # Prove the guard catches what content+order alone could not (#50 verify R2): a text
+    # swap, an added-prose overclaim, a COLUMN-x swap, a fill-COLOUR swap, and a footer
+    # score transpose ALL fail loud — each leaves most of the SVG individually true.
     import pytest
     svg = open(SVG_PATH, encoding="utf-8").read()
-    swapped = (svg.replace("✓ 19.2.7", "\x00").replace("✗ v18", "✓ 19.2.7").replace("\x00", "✗ v18"))
-    assert swapped != svg
-    with pytest.raises(AssertionError):
-        _assert_svg_faithful(swapped)
+    _assert_svg_faithful(svg)                             # baseline: the committed asset passes
+
+    nodes = _svg_text_nodes(svg)
+    ld_x, c7_x = nodes[6]["x"], nodes[8]["x"]             # react's two value-cell x (body[2]/[4])
+
+    def swap(s, a, b):
+        return s.replace(a, "\x00").replace(b, a).replace("\x00", b)
+
+    mutations = {
+        "text-swap":        lambda s: swap(s, "✓ 19.2.7", "✗ v18"),
+        "added-prose":      lambda s: s.replace("✓ 19.2.7", "✓ 19.2.7 — context7 is outdated garbage"),
+        "column-x-swap":    lambda s: swap(s, f'x="{ld_x}"', f'x="{c7_x}"'),
+        "colour-swap":      lambda s: swap(s, "fill: #1b7f4b", "fill: #c0392b"),
+        "footer-transpose": lambda s: swap(s, "6/6", "0/6"),
+    }
+    for name, mutate in mutations.items():
+        tampered = mutate(svg)
+        assert tampered != svg, f"{name}: mutation was a no-op (test bug)"
+        with pytest.raises(AssertionError):
+            _assert_svg_faithful(tampered)
 
 
 def test_emit_chart_check_flags_drift(tmp_path):
@@ -118,39 +134,60 @@ def _snapshot_version_tokens():
             + [r["context7_version"] for r in rows if r["context7_version"]])
 
 
+_TEXT_RE = re.compile(r"<text\s+([^>]*?)>(.*?)</text>", re.DOTALL)
+
+
+def _svg_text_nodes(svg):
+    """Every <text> as {text, x, fill} — NOT just the string. The x-attribute and the
+    `fill:` colour live on each <text>, so parsing them lets the guard catch a coordinate
+    or colour swap that leaves the text content + document order untouched (#50 verify R2)."""
+    nodes = []
+    for attrs, content in _TEXT_RE.findall(svg):
+        xm = re.search(r'\bx="([-\d.]+)"', attrs)
+        fm = re.search(r"fill:\s*(#[0-9a-fA-F]{6})", attrs)
+        nodes.append({
+            "text": re.sub(r"\s+", " ", content).strip(),
+            "x": float(xm.group(1)) if xm else None,
+            "fill": fm.group(1).lower() if fm else None,
+        })
+    return nodes
+
+
 def _parse_svg_scorecard(svg):
-    """Parse the SVG's ordered <text> cells into {library: {livedocs_cell, context7_cell}}.
-    The chart emits one <text> per label in a fixed order — title, 3 headers, then 6
-    per row (library, ecosystem, LiveDocs-cell, 'current', context7-cell, status), then
-    a footer — so a layout change makes the % 6 assert fail LOUD, never silently pass."""
-    texts = [re.sub(r"\s+", " ", m).strip()
-             for m in re.findall(r"<text[^>]*>(.*?)</text>", svg, re.DOTALL)]
-    body = texts[4:-1]                                # drop title + 3 headers and the footer
-    assert body and len(body) % 6 == 0, f"unexpected SVG <text> layout ({len(texts)} texts)"
+    """Group the ordered <text> nodes into {library: {livedocs, context7}} (each a node
+    dict with text/x/fill) + the footer node's text. Fixed emit order — title, 3 headers,
+    then 6 per row (library, ecosystem, LiveDocs-cell, sub, context7-cell, sub), footer —
+    so a layout change makes the % 6 assert fail LOUD, never silently pass."""
+    nodes = _svg_text_nodes(svg)
+    body = nodes[4:-1]                                # drop title + 3 headers and the footer
+    assert body and len(body) % 6 == 0, f"unexpected SVG <text> layout ({len(nodes)} nodes)"
     cells = {}
     for i in range(0, len(body), 6):
-        lib, _eco, ld_cell, _cur, c7_cell, _sub = body[i:i + 6]
-        cells[lib] = {"livedocs_cell": ld_cell, "context7_cell": c7_cell}
-    return cells, texts[-1]
+        cells[body[i]["text"]] = {"livedocs": body[i + 2], "context7": body[i + 4]}
+    return cells, nodes[-1]["text"]
 
 
 def _assert_svg_faithful(svg):
-    """Raise AssertionError unless the SVG encodes the snapshot's per-library claims in
-    the right columns and the headline matches tally() (the reusable guard body)."""
+    """Raise AssertionError unless the SVG encodes the snapshot's per-library claims
+    faithfully — checking, per cell, (1) content EQUALITY vs the verdict-derived cell
+    (added prose / wrong number fails), (2) fill COLOUR (a colour swap fails), (3) column
+    ORDER via x (a coordinate swap that inverts the columns fails) — plus (4) the footer's
+    tool↔score binding as ANCHORED substrings (a `6/6`↔`0/6` transpose fails). Version-
+    independent: x-ordering + fixed hex colours are stable where layout bytes are not."""
+    from chart import scorecard_cells
     cells, footer = _parse_svg_scorecard(svg)
     rows = chart.chart_rows(SAMPLE)
     for r in rows:
         c = cells.get(r["library"])
         assert c, f"{r['library']} row missing from SVG"
-        ld, c7 = c["livedocs_cell"], c["context7_cell"]
-        assert ld.startswith("✓") and version_matches(ld, r["ground_truth"]), \
-            f"{r['library']}: LiveDocs cell {ld!r} is not '✓ {r['ground_truth']}' (stale/swapped)"
-        assert c7.startswith("✗"), f"{r['library']}: context7 cell {c7!r} not marked stale"
-        if r["context7_version"]:
-            assert version_matches(c7, r["context7_version"]), \
-                f"{r['library']}: context7 cell {c7!r} != {r['context7_version']}"
-        else:
-            assert "version-less" in c7, f"{r['library']}: context7 cell {c7!r} not version-less"
+        exp = scorecard_cells(r)
+        ld, c7 = c["livedocs"], c["context7"]
+        assert ld["text"] == exp["livedocs"][0], f"{r['library']}: LiveDocs cell {ld['text']!r} != {exp['livedocs'][0]!r}"
+        assert c7["text"] == exp["context7"][0], f"{r['library']}: context7 cell {c7['text']!r} != {exp['context7'][0]!r}"
+        assert ld["fill"] == exp["livedocs"][1], f"{r['library']}: LiveDocs fill {ld['fill']} != {exp['livedocs'][1]} (colour swap?)"
+        assert c7["fill"] == exp["context7"][1], f"{r['library']}: context7 fill {c7['fill']} != {exp['context7'][1]} (colour swap?)"
+        assert ld["x"] is not None and c7["x"] is not None, f"{r['library']}: cell x missing"
+        assert ld["x"] < c7["x"], f"{r['library']}: columns swapped (LiveDocs x {ld['x']} !< context7 x {c7['x']})"
     t = tally(rows)
-    assert f"{t['livedocs_current']}/{t['n']}" in footer, f"LiveDocs score not {t['livedocs_current']}/{t['n']}: {footer!r}"
-    assert f"{t['context7_current']}/{t['n']}" in footer, f"context7 score not {t['context7_current']}/{t['n']}: {footer!r}"
+    assert f"LiveDocs current on {t['livedocs_current']}/{t['n']}" in footer, f"footer LiveDocs score wrong: {footer!r}"
+    assert f"context7 on {t['context7_current']}/{t['n']}" in footer, f"footer context7 score wrong: {footer!r}"

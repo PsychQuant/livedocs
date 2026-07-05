@@ -10,10 +10,11 @@ MEASURED, never asserted (#27/#29): every value is verbatim from the snapshot �
 surface a test pins against the snapshot. The honesty caveats live in the README
 caption (visible markdown), not inside this image.
 
-Deterministic SVG so the committed asset can be regenerated + drift-guarded:
-a fixed `svg.hashsalt`, `svg.fonttype='none'` (version strings stay real `<text>`
-— greppable AND laid out from matplotlib's bundled DejaVu Sans, so stable), and
-the `Date` metadata stripped at savefig.
+Regenerable SVG with a fixed `svg.hashsalt` + `svg.fonttype='none'` (version strings
+stay real `<text>` — greppable) + `Date`/`Creator` metadata stripped. NOTE: the SVG is
+NOT byte-stable across matplotlib/freetype versions (text coordinates reflow), so the
+drift guard is the version-independent SEMANTIC check in test_chart.py — it verifies each
+cell's content, column, colour, and the footer against the snapshot — not byte-identity.
 """
 import io
 import os
@@ -62,6 +63,25 @@ def _cell(ax, x, y, color, main, sub):
     ax.text(x, y - 0.23, sub, fontsize=8, color=_SUB, va="center")
 
 
+def scorecard_cells(row):
+    """The (main-text, colour, sub-text) for a row's LiveDocs and context7 cells,
+    DERIVED FROM THE MEASURED VERDICT (livedocs_current / context7_current), not from
+    the column. This is the SINGLE definition shared by build_figure (rendering) and the
+    drift guard (verification), so the image and the check can never disagree, and a
+    future context7-current row renders ✓ instead of a hardcoded ✗ (#50 verify R2)."""
+    ld_cur, c7_cur = row["livedocs_current"], row["context7_current"]
+    livedocs = (("✓ " if ld_cur else "✗ ") + str(row["livedocs_version"]),
+                _GREEN if ld_cur else _RED,
+                "current" if ld_cur else "stale")
+    if c7_cur:
+        context7 = ("✓ " + str(row["context7_version"]), _GREEN, str(row["context7_status"]))
+    elif row["context7_version"]:
+        context7 = ("✗ " + str(row["context7_version"]), _RED, str(row["context7_status"]))
+    else:
+        context7 = ("✗ version-less", _GREY, "no version in top match")
+    return {"livedocs": livedocs, "context7": context7}
+
+
 def build_figure(rows, captured_at, counts):
     """Build the scorecard Figure. No shared numeric axis — versions across libs
     (19.2.7 / 0.139.0 / 1.0.228) aren't comparable, so this is categorical: each
@@ -75,6 +95,14 @@ def build_figure(rows, captured_at, counts):
     n_rows = len(rows)
     n = counts["n"]
     lc, cc = counts["livedocs_current"], counts["context7_current"]
+    # Fail loud rather than silently ship a chart that DRAWS n_rows rows while its title +
+    # footer claim the (contested) tally n. Today they're equal (all rows contested); a
+    # future non-contested row must be a DELIBERATE display decision, not a silent skew
+    # between the visible body and the printed denominator (#50 verify R2).
+    assert n_rows == n, (
+        f"chart would draw {n_rows} rows but the headline/footer claim {n} "
+        f"(a non-contested row slipped in — decide how to present partial data first)"
+    )
     fig, ax = plt.subplots(figsize=(8.4, 0.72 * n_rows + 2.5))
     ax.set_xlim(0, 10)
     ax.set_ylim(-0.7, n_rows + 2.0)
@@ -94,11 +122,9 @@ def build_figure(rows, captured_at, counts):
             ax.plot([0.2, 9.8], [y + 0.5, y + 0.5], color="#f0f0f0", lw=0.8)
         ax.text(0.25, y + 0.13, r["library"], fontsize=11, fontweight="bold", va="center", color=_INK)
         ax.text(0.25, y - 0.23, r["ecosystem"], fontsize=8, va="center", color=_GREY)
-        _cell(ax, 3.6, y, _GREEN, "✓ " + str(r["livedocs_version"]), "current")
-        if r["context7_version"]:
-            _cell(ax, 6.55, y, _RED, "✗ " + str(r["context7_version"]), str(r["context7_status"]))
-        else:
-            _cell(ax, 6.55, y, _GREY, "✗ version-less", "no version in top match")
+        cells = scorecard_cells(r)   # mark/colour derived from the verdict (shared with the guard)
+        _cell(ax, 3.6, y, cells["livedocs"][1], cells["livedocs"][0], cells["livedocs"][2])
+        _cell(ax, 6.55, y, cells["context7"][1], cells["context7"][0], cells["context7"][2])
 
     ax.plot([0.2, 9.8], [0.05, 0.05], color="#dddddd", lw=1)
     ax.text(5, -0.35,
@@ -113,9 +139,13 @@ def render_svg(sample, captured_at=None):
     """Return the deterministic SVG string rendered from the snapshot.
 
     Validates captured_at (parity with the README path — #50 verify R1) so an
-    unvalidated date can't be baked into the front-page image. Strips BOTH `Date`
-    and `Creator` metadata: `Creator` otherwise hard-codes `Matplotlib vX.Y.Z`, which
-    made the byte-level `--emit-chart --check` false-drift on any matplotlib bump."""
+    unvalidated date can't be baked into the front-page image. Strips `Date` + `Creator`
+    metadata: `Creator` otherwise hard-codes `Matplotlib vX.Y.Z`. That removes ONE
+    version-volatile source, but does NOT byte-stabilize the SVG — with `fonttype='none'`
+    the text y-coordinates are still computed from freetype font metrics, so a matplotlib/
+    freetype bump reflows them. Byte-identity is therefore NOT the CI drift guard; the
+    version-independent semantic guard in test_chart.py (content + column-x + fill-colour
+    + anchored footer, all vs the snapshot) is (#50 verify R2)."""
     captured_at = captured_at or sample.get("captured_at")
     _require_iso_date(captured_at)
     rows = chart_rows(sample)

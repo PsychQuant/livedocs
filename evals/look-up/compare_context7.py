@@ -14,9 +14,10 @@ fetcher and a pre-built index are trying to reflect).
   than brittle-parsing prose.
 
 Honesty guard (see README): this measures freshness only. context7 legitimately
-wins on doc/snippet breadth, and often *has* the current version in a lower-ranked
-entry — conceded explicitly. We do not measure coverage (a pre-built index's home
-turf). If a run shows context7 current for some library, it is reported as such.
+wins on doc/snippet breadth, and *can* have the current version in a lower-ranked
+entry (as with react in the sample — the other five do not) — conceded explicitly.
+We do not measure coverage (a pre-built index's home turf). If a run shows context7
+current for some library, it is reported as such.
 
 The comparison data is a dated snapshot in compare_context7_sample.json,
 reproducible by re-running both MCP tools by hand (procedure in README). Pass
@@ -188,7 +189,7 @@ def render_readme_block(rows, captured_at):
         "",
         f"_**Latest-version freshness**, {n} fast-moving libraries · captured {captured_at} · "
         "**measured, not asserted**: freshness of the *default match* only — context7 wins on doc coverage "
-        "and often carries the current version in a lower-ranked entry (both conceded, not measured), "
+        "and can carry the current version in a lower-ranked entry (as with react here; both conceded, not measured), "
         "the libraries are forward-selected fast-movers, and LiveDocs is the registry by construction. "
         "Data + method: [`evals/look-up`](https://github.com/PsychQuant/livedocs/tree/main/evals/look-up)._",
         README_END,
