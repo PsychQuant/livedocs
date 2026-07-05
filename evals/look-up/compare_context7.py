@@ -187,7 +187,8 @@ def render_readme_block(rows, captured_at):
         f"![{alt}]({CHART_ASSET})",
         "",
         f"_**Latest-version freshness**, {n} fast-moving libraries · captured {captured_at} · "
-        "**measured, not asserted**: freshness only — context7 wins on doc coverage (conceded, not measured), "
+        "**measured, not asserted**: freshness of the *default match* only — context7 wins on doc coverage "
+        "and often carries the current version in a lower-ranked entry (both conceded, not measured), "
         "the libraries are forward-selected fast-movers, and LiveDocs is the registry by construction. "
         "Data + method: [`evals/look-up`](https://github.com/PsychQuant/livedocs/tree/main/evals/look-up)._",
         README_END,

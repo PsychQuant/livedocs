@@ -53,7 +53,7 @@ python3 -m pytest evals/look-up/tests/  # 66 個 Python eval test
 |------|---:|--------|
 | `test_run_eval.py` | 17 | rate 門檻判定、N=3 門檻塌縮 guard、failed-run / inconclusive 處理、explicit route 比對、`args_match`——對的工具但錯的參數(mis-split `name@version` / 掉 ecosystem pin)判為不正確。 |
 | `test_compare.py` | 20 | vs-context7 新鮮度 harness:版本 token 比對(邊界形式)、對稱計分、表格 render、README 圖片嵌入區塊漂移守衛(唯一*完整*區塊含 orphaned sentinel、ISO 日曆日期驗證、`main()` `--check`/`--write` exit code + write round-trip)、corpus↔sample 同步。 |
-| `test_chart.py` | 8 | 逐庫 vs-context7 SVG 圖:`chart_rows` 是 snapshot 的 verbatim 投影、render + committed SVG 帶每個 snapshot 版本 token(資料層漂移守衛)、render 確定性、`--emit-chart` `--check`/`--write` CLI(in-sync / drift / write round-trip / flag 互斥)。 |
+| `test_chart.py` | 8 | 逐庫 vs-context7 SVG 圖:`chart_rows` 是 snapshot 的 verbatim 投影、committed SVG **語意**忠實(逐庫 cell 以 `version_matches` 綁對欄位、headline == `tally()`、證明能抓欄位對調)——matplotlib 版本無關的漂移守衛、render 確定性、`--emit-chart` `--check`/`--write` CLI(drift / write round-trip / flag 互斥)。 |
 | `test_oracle.py` | 8 | `self_check`(eval 時打 registry —— 防腐爛)/ `structural` / `golden` oracle。 |
 | `test_detect.py` | 9 | `claude -p` stream-json 解析、`is_error` 偵測、LiveDocs 觸發訊號辨識、逐 call 工具輸入捕捉(short name + input args)。 |
 | `test_corpus.py` | 4 | corpus 覆蓋守衛(存在一個 golden case + 一個 library-named 對抗負面案例 + explicit /livedocs:look-up 各 argument shape 都有代表案例 + arg-sensitive 案例 pin 住 `expected_args`)。 |

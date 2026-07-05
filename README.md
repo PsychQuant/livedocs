@@ -3,7 +3,7 @@
 <!-- BEGIN vs-context7 (generated: compare_context7.py --emit-readme --write — do not hand-edit) -->
 ![Per-library latest-version freshness on 6 fast-moving libraries: LiveDocs returns the current release on 6/6; context7's default match on 0/6 (freshness only, context7 wins on coverage).](docs/assets/vs-context7-freshness.svg)
 
-_**Latest-version freshness**, 6 fast-moving libraries · captured 2026-07-02 · **measured, not asserted**: freshness only — context7 wins on doc coverage (conceded, not measured), the libraries are forward-selected fast-movers, and LiveDocs is the registry by construction. Data + method: [`evals/look-up`](https://github.com/PsychQuant/livedocs/tree/main/evals/look-up)._
+_**Latest-version freshness**, 6 fast-moving libraries · captured 2026-07-02 · **measured, not asserted**: freshness of the *default match* only — context7 wins on doc coverage and often carries the current version in a lower-ranked entry (both conceded, not measured), the libraries are forward-selected fast-movers, and LiveDocs is the registry by construction. Data + method: [`evals/look-up`](https://github.com/PsychQuant/livedocs/tree/main/evals/look-up)._
 <!-- END vs-context7 -->
 
 A **Claude Code plugin** for primary-source-first, always-latest documentation.
