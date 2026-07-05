@@ -38,12 +38,14 @@ footnote.
    rot (this line once said `0.138.2`); the harness is the living source — re-run
    `evals/look-up/compare_context7.py` for today's.
 2. Private and free, by construction. Your query goes straight to the authoritative source
-   (npm, PyPI, the docs host) with no third-party index in between to see, log, meter, or
-   breach it — and version reconciliation reads your locally-installed copy offline. There is
-   no LiveDocs vendor at all. No account, no API key, no seat, no per-token fee for private
-   repos. Matching that vendor-free posture on context7 means self-hosting, a paid tier.
-   (context7 is SOC-2-certified and *offers* self-host — the edge is structural absence, not
-   that context7 is unsafe; see the head-to-head.)
+   (npm, PyPI, the docs host) — no third-party index in between to log, meter, or rank what you
+   looked up — and version reconciliation reads your locally-installed copy offline. There is no
+   LiveDocs *service* on the query path: no account, no API key, no seat, no per-token fee, no
+   server that could be breached to leak what you looked up. (Trust doesn't vanish — it *shifts*
+   to the local signed binary and its distribution; a different surface, spelled out in the
+   head-to-head.) Matching that vendor-free posture on context7 means self-hosting — its
+   custom-priced Enterprise tier. context7 is SOC-2 Type II certified and *offers* self-host; the
+   edge is structural absence, not that context7 is unsafe.
 3. Raw and installed. Returns verbatim primary text, and can read the version you actually
    have. context7 returns ranked, model-summarized snippets, often weeks old.
 
@@ -54,9 +56,9 @@ footnote.
 | Freshness | live, direct-to-source, ETag-revalidated | periodically recrawled, so it lags |
 | Fidelity | raw verbatim reachable | ranked, model-summarized snippets |
 | Your environment | matched to the installed version | version-agnostic snapshot |
-| Architecture | local tool, no vendor backend | hosted SaaS by default (self-host is a paid tier) |
-| Privacy | no third-party index sees your query (direct to source) | default routes through their cloud (local processing + SOC-2 claimed) |
-| Cost | free, unmetered; private repos included | metered free tier (public only) + paid Pro / Enterprise |
+| Architecture | local tool, no backend (trust → the signed binary) | hosted SaaS by default (self-host = Enterprise tier) |
+| Privacy | no third-party index in the query path (origin host still sees it) | cloud by default (local-processing claimed; SOC-2 Type II) |
+| Cost | unmetered (you bear origin-host rate limits) | metered free tier (public only) + paid Pro / Enterprise |
 | Breadth | ~any public lib via generic discovery + adapters | large pre-indexed corpus |
 
 The Freshness row is measured, not asserted: the
@@ -70,15 +72,24 @@ freshness). Both are **structural** claims, not measured metrics — so the hone
 is dated citation + concession, not a drift-guarded number:
 
 - **Vendor / privacy.** context7's default is a managed cloud service ("Built by Upstash"; a
-  dedicated hosted database per organization). It *offers* self-hosted / on-premise, claims
-  local query processing, and is SOC-2 Type II certified. LiveDocs has no vendor server at all
-  — nothing to deploy, trust, or breach. The edge is *structural absence*, not that context7 is
-  insecure; note that vendor-free operation on context7 is itself the paid self-host tier.
-- **Cost** (dated capture, context7 pricing 2026-07-05): Free = 1,000 calls/mo, public repos
-  only; Pro = $10/seat/mo, with private-repo parsing billed at $25 / 1M tokens; Enterprise =
-  custom. LiveDocs is unmetered because it never calls a metered API — it reads your sources
-  locally, private repos included, at no cost. Figures rot; the durable claim is the *structure*
-  (metered SaaS vs unmetered local), so cite the structure and date any figure. context7's free
+  dedicated *private* database per organization). It *offers* self-hosted / on-premise (its
+  custom-priced Enterprise tier), is SOC-2 Type II certified, and claims queries are "processed
+  locally." Read that claim precisely: even client-side processing still sends the *index lookup*
+  to context7's hosted per-org database — that hosted index is exactly what LiveDocs structurally
+  lacks. LiveDocs has no service on the query path to breach. But be symmetric about the trust
+  surface — it doesn't disappear, it *moves*: to the local signed binary and its distribution
+  channel (a compromised release or signing key is its own, arguably larger, blast radius), and
+  the origin host + your network still see which library you fetched. So the honest claim is a
+  *different* trust surface, not a strictly smaller one — with no third-party doc index in it,
+  and no metered vendor.
+- **Cost** (dated capture, context7 pricing 2026-07-05): Free = 1,000 included calls, public
+  repos only; Pro = $10/seat/mo, with private-repo parsing billed at $25 / 1M tokens; Enterprise
+  = custom. LiveDocs is unmetered because there is no metered API to call — but "unmetered" isn't
+  "costless": you bear the origin hosts' own rate limits and your bandwidth. And "private repos"
+  is a *different mechanism*, not a free superset — context7 parses+indexes a repo in its cloud,
+  whereas LiveDocs reads the copy already installed on your machine (it can't fetch a private repo
+  you haven't checked out). Figures rot; the durable claim is the *structure* (metered SaaS vs
+  unmetered local), so cite the structure and date any figure. context7's free
   tier is real, and its pre-indexed breadth is its home turf (conceded above).
 
 ## Honest reality: positioning ≠ winning
