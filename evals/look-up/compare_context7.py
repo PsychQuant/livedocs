@@ -21,7 +21,8 @@ current for some library, it is reported as such.
 
 The comparison data is a dated snapshot in compare_context7_sample.json,
 reproducible by re-running both MCP tools by hand (procedure in README). Pass
---verify-live to re-fetch registry ground truth and warn on drift.
+--verify-live to re-fetch registry ground truth — it exits 1 on drift or when any
+library could not be verified (#49); --check-staleness bounds the snapshot's age.
 """
 import argparse
 import datetime
@@ -284,7 +285,14 @@ def main(argv=None):
     if args.check_staleness:
         captured = sample.get("captured_at")
         try:
-            today = datetime.date.fromisoformat(args.today) if args.today else datetime.date.today()
+            if args.today:
+                # Same strict ISO-calendar round-trip as captured_at — Python 3.11+'s bare
+                # fromisoformat is lenient (accepts e.g. "20260702"), which would let a
+                # mistyped override silently parse (#49 verify round 1).
+                _require_iso_date(args.today)
+                today = datetime.date.fromisoformat(args.today)
+            else:
+                today = datetime.date.today()
         except (ValueError, TypeError):
             print(f"✗ --today must be an ISO date (YYYY-MM-DD); got {args.today!r}", file=sys.stderr)
             return 1
@@ -366,23 +374,40 @@ def main(argv=None):
         print("note: --verify-live re-checks the registry (LiveDocs' ground truth) only; "
               "context7's recorded judgments are a dated snapshot, not re-fetched here.",
               file=sys.stderr)
-        drifted = 0
+        drifted, verified, unverified = 0, 0, 0
         for e, r in zip(results, rows):
             lib, eco = e.get("library"), e.get("ecosystem")
             if not lib or not eco:
                 continue
             live = fetch_latest_version(lib, eco)
-            if live and live != r["ground_truth"]:
+            if not live:
+                # fetch_latest_version returns None on network failure OR an ecosystem it
+                # doesn't support — either way this library was NOT verified. Silently
+                # treating that as "no drift" made a registry outage a false GREEN
+                # (#49 verify round 1): green must provably mean "all checked, none drifted".
+                unverified += 1
+                print(f"⚠ unverified: could not fetch a live version for {lib} ({eco}) — "
+                      "registry unreachable or unsupported ecosystem", file=sys.stderr)
+                continue
+            verified += 1
+            if live != r["ground_truth"]:
                 drifted += 1
                 print(f"⚠ drift: {lib} recorded {r['ground_truth']} but registry now {live}",
                       file=sys.stderr)
-        # Fail LOUD on drift (#49): a scheduled run that only prints warnings to an
-        # unread log is not a signal. Exit 1 → the freshness workflow goes red → the
-        # maintainer refreshes the snapshot (procedure: evals/look-up/README.md).
+        # Fail LOUD (#49): a run that only prints warnings to an unread log is not a
+        # signal. Green must mean "verified all N, none drifted" — drift AND
+        # couldn't-verify both exit 1, with distinct messages.
+        print(f"verified {verified} of {len(results)} recorded ground truths "
+              f"({drifted} drifted, {unverified} unverified)", file=sys.stderr)
         if drifted:
             print(f"✗ {drifted} of {len(results)} recorded ground truths have drifted — "
                   "refresh the snapshot per evals/look-up/README.md § Refreshing the snapshot.",
                   file=sys.stderr)
+            return 1
+        if unverified:
+            print(f"✗ {unverified} of {len(results)} libraries could not be verified — "
+                  "nothing was proven about them; re-run when the registry is reachable "
+                  "(or add oracle support for the ecosystem).", file=sys.stderr)
             return 1
 
     t = tally(rows)

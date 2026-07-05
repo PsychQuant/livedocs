@@ -150,12 +150,30 @@ LiveDocs returned the live registry version each time.
 ### Refreshing the snapshot (#49)
 
 The front-page claim is only as honest as the snapshot's `captured_at`. Two mechanical
-signals tell you it's time (both run monthly by `.github/workflows/freshness.yml`, and
-either can be run by hand):
+signals tell you it's time (run monthly by `.github/workflows/freshness.yml`, and either
+can be run by hand):
 
-- `--verify-live` exits 1 → the registry has moved past a recorded `ground_truth`;
-- `--check-staleness` exits 1 → `captured_at` is over the age budget (default 120 days,
-  tunable via `--max-age-days`).
+- `--verify-live` exits 1 → the registry has moved past a recorded `ground_truth`, **or**
+  some library could not be verified (registry unreachable / unsupported ecosystem —
+  never silently counted as "no drift"). On the *scheduled* run this step is
+  **informational** (drift on a deliberately fast-moving corpus is expected over time);
+  on a PR that touches the sample it is a **hard gate** — a tampered or mis-refreshed
+  `ground_truth` reddens that PR against live reality.
+- `--check-staleness` exits 1 → `captured_at` is over the age budget — the **hard**
+  monthly signal. Default 120 days ≈ one typical release cycle for this project — long
+  enough that refreshes aren't busywork, short enough that a dated front-page claim
+  can't quietly become ancient; tunable via `--max-age-days`.
+
+Two honesty notes on the machinery itself:
+
+- **GitHub platform limit**: scheduled workflows are auto-disabled after ~60 days of
+  repository inactivity — the cron dies quietly exactly when the repo goes dormant. If
+  returning after a quiet stretch, check the Actions tab (re-enable if disabled) or run
+  `--check-staleness` by hand.
+- **The date is an attestation, not a proof.** Bumping `captured_at` asserts you actually
+  re-judged context7's side (step 1 below). Bumping the date without re-judging is
+  fabricating a capture — no tool can catch it (context7's column is a recorded human
+  judgment); the procedure is trust-based by design.
 
 Refresh procedure (deliberately a **human** act — context7's column is a recorded
 judgment, not queryable):
@@ -170,7 +188,9 @@ judgment, not queryable):
    `python3 evals/look-up/compare_context7.py --emit-chart --write` then
    `--emit-readme --write`.
 4. `python3 -m pytest evals/look-up/tests/` — the drift guards confirm README ⟷ sample
-   ⟷ SVG are in sync again; commit sample + SVG + README together.
+   ⟷ SVG (and the wiki Home numbers) are in sync again; commit sample + SVG + README
+   together. The staleness tests pin their own sample fixture, so a refresh never
+   breaks them.
 
 ## Scope / caveats
 
