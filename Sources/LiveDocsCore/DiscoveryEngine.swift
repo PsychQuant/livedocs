@@ -84,14 +84,20 @@ public struct DiscoveryEngine: Sendable {
             }
         }
 
-        // llms.txt leg: probe candidates across every docs host we found, stop at
-        // the first real hit per host, then try to upgrade it to llms-full.txt.
+        // llms.txt leg: probe each host's candidates CONCURRENTLY (#57 — wall-clock
+        // ≈ the slowest single probe instead of the sum), selecting by preference
+        // order so the result is identical to the old sequential loop. The
+        // llms-full "upgrade" is satisfied from the same collected results (the
+        // sibling is in the candidate set), never re-probed. Hosts stay sequential
+        // with an early break — concurrency is bounded to ONE host's candidate set
+        // (≤6 in-flight requests), so a hit on the first host never spams the rest.
         for host in dedupe(docsHosts) {
-            if let hit = await probeLlms(host: host) {
-                sources.append(hit)
-                if hit.kind == .llmsIndex,
-                   let fullURL = llmsFullSibling(of: hit.url),
-                   let full = await probeExact(url: fullURL) {
+            let hits = await probeLlmsAll(host: host)
+            if let best = hits.first?.source {
+                sources.append(best)
+                if best.kind == .llmsIndex,
+                   let fullURL = llmsFullSibling(of: best.url),
+                   let full = hits.first(where: { $0.source.url == fullURL })?.source {
                     sources.append(full)
                 }
                 break   // one good llms source is enough; don't spam every host
@@ -397,12 +403,27 @@ public struct DiscoveryEngine: Sendable {
         return await getParse(url, parseMavenSearch)
     }
 
-    /// Probe the ordered llms.txt candidates for a host; return the first real hit.
-    private func probeLlms(host: String) async -> DiscoverySource? {
-        for candidate in llmsTxtCandidates(for: host) {
-            if let hit = await probeExact(url: candidate) { return hit }
+    /// Probe ALL ordered llms.txt candidates for a host concurrently (#57); return
+    /// every real hit sorted by candidate index. Selection by INDEX — never by
+    /// completion order — keeps the outcome deterministic and identical to the old
+    /// sequential first-hit-wins loop, while the wall-clock cost drops from the sum
+    /// of the probes to roughly the slowest one. Trade (documented + test-pinned):
+    /// all of this ONE host's candidates are fetched even when the first would have
+    /// hit — bounded politeness (≤6 requests to a single origin).
+    private func probeLlmsAll(host: String) async -> [(index: Int, source: DiscoverySource)] {
+        let candidates = llmsTxtCandidates(for: host)
+        guard !candidates.isEmpty else { return [] }
+        let hits = await withTaskGroup(of: (Int, DiscoverySource?).self) { group in
+            for (i, url) in candidates.enumerated() {
+                group.addTask { (i, await self.probeExact(url: url)) }
+            }
+            var out: [(Int, DiscoverySource)] = []
+            for await (i, src) in group {
+                if let s = src { out.append((i, s)) }
+            }
+            return out
         }
-        return nil
+        return hits.sorted { $0.0 < $1.0 }.map { (index: $0.0, source: $0.1) }
     }
 
     /// Probe one exact URL and classify it. Returns a source only on a real hit.
