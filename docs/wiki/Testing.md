@@ -63,11 +63,16 @@ vs-context7 comparison harness. See
 
 ## CI and the release gate
 
-- **CI** runs `swift build` + `swift test` on every push and pull request.
+- **CI** runs `swift build` + `swift test` **and the Python unit suite** on every push and
+  pull request (#48). The Python job makes no network / API calls; it is what fires the
+  vs-context7 drift guards (README block + the chart's matplotlib-version-independent
+  semantic guard) mechanically at the PR gate. The byte-level `--emit-chart --check` stays
+  maintainer-local (freetype-fragile across matplotlib versions).
 - **`scripts/release.sh`** gates a release on a green `swift test`, a version-source match
   against the tag, and Developer ID signing + notarization.
-- The **Python eval** is periodic / manual, not per-PR CI — it makes real `claude -p` calls
-  (cost + stochastic), so it runs as a maintainer baseline rather than on the critical path.
+- The **live Python eval** (`run_eval.py`) is periodic / manual, not per-PR CI — it makes
+  real `claude -p` calls (cost + stochastic), so it runs as a maintainer baseline rather
+  than on the critical path.
 
 ## Discipline
 
