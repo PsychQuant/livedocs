@@ -66,9 +66,10 @@ def test_committed_svg_is_semantically_faithful():
 
 
 def test_semantic_guard_catches_visual_lies():
-    # Prove the guard catches what content+order alone could not (#50 verify R2): a text
-    # swap, an added-prose overclaim, a COLUMN-x swap, a fill-COLOUR swap, and a footer
-    # score transpose ALL fail loud — each leaves most of the SVG individually true.
+    # Prove the guard catches EVERY <text>-level lie, not just the value cells (#50 verify
+    # R2 + R3): value-cell text-swap / added-prose / COLUMN-x swap / fill-COLOUR swap /
+    # footer transpose, AND a SUB-CAPTION lie and a HEADER swap — all fail loud. Each
+    # leaves most of the SVG individually true; only whole-image faithfulness exposes it.
     import pytest
     svg = open(SVG_PATH, encoding="utf-8").read()
     _assert_svg_faithful(svg)                             # baseline: the committed asset passes
@@ -85,6 +86,8 @@ def test_semantic_guard_catches_visual_lies():
         "column-x-swap":    lambda s: swap(s, f'x="{ld_x}"', f'x="{c7_x}"'),
         "colour-swap":      lambda s: swap(s, "fill: #1b7f4b", "fill: #c0392b"),
         "footer-transpose": lambda s: swap(s, "6/6", "0/6"),
+        "sub-caption-lie":  lambda s: s.replace("no version in top match", "context7 is actually current + better"),
+        "header-swap":      lambda s: swap(s, ">LiveDocs<", ">context7 (default match)<"),
     }
     for name, mutate in mutations.items():
         tampered = mutate(svg)
@@ -153,41 +156,32 @@ def _svg_text_nodes(svg):
     return nodes
 
 
-def _parse_svg_scorecard(svg):
-    """Group the ordered <text> nodes into {library: {livedocs, context7}} (each a node
-    dict with text/x/fill) + the footer node's text. Fixed emit order — title, 3 headers,
-    then 6 per row (library, ecosystem, LiveDocs-cell, sub, context7-cell, sub), footer —
-    so a layout change makes the % 6 assert fail LOUD, never silently pass."""
-    nodes = _svg_text_nodes(svg)
-    body = nodes[4:-1]                                # drop title + 3 headers and the footer
-    assert body and len(body) % 6 == 0, f"unexpected SVG <text> layout ({len(nodes)} nodes)"
-    cells = {}
-    for i in range(0, len(body), 6):
-        cells[body[i]["text"]] = {"livedocs": body[i + 2], "context7": body[i + 4]}
-    return cells, nodes[-1]["text"]
-
-
 def _assert_svg_faithful(svg):
-    """Raise AssertionError unless the SVG encodes the snapshot's per-library claims
-    faithfully — checking, per cell, (1) content EQUALITY vs the verdict-derived cell
-    (added prose / wrong number fails), (2) fill COLOUR (a colour swap fails), (3) column
-    ORDER via x (a coordinate swap that inverts the columns fails) — plus (4) the footer's
-    tool↔score binding as ANCHORED substrings (a `6/6`↔`0/6` transpose fails). Version-
-    independent: x-ordering + fixed hex colours are stable where layout bytes are not."""
-    from chart import scorecard_cells
-    cells, footer = _parse_svg_scorecard(svg)
-    rows = chart.chart_rows(SAMPLE)
-    for r in rows:
-        c = cells.get(r["library"])
-        assert c, f"{r['library']} row missing from SVG"
-        exp = scorecard_cells(r)
-        ld, c7 = c["livedocs"], c["context7"]
-        assert ld["text"] == exp["livedocs"][0], f"{r['library']}: LiveDocs cell {ld['text']!r} != {exp['livedocs'][0]!r}"
-        assert c7["text"] == exp["context7"][0], f"{r['library']}: context7 cell {c7['text']!r} != {exp['context7'][0]!r}"
-        assert ld["fill"] == exp["livedocs"][1], f"{r['library']}: LiveDocs fill {ld['fill']} != {exp['livedocs'][1]} (colour swap?)"
-        assert c7["fill"] == exp["context7"][1], f"{r['library']}: context7 fill {c7['fill']} != {exp['context7'][1]} (colour swap?)"
-        assert ld["x"] is not None and c7["x"] is not None, f"{r['library']}: cell x missing"
-        assert ld["x"] < c7["x"], f"{r['library']}: columns swapped (LiveDocs x {ld['x']} !< context7 x {c7['x']})"
-    t = tally(rows)
-    assert f"LiveDocs current on {t['livedocs_current']}/{t['n']}" in footer, f"footer LiveDocs score wrong: {footer!r}"
-    assert f"context7 on {t['context7_current']}/{t['n']}" in footer, f"footer context7 score wrong: {footer!r}"
+    """Raise AssertionError unless the committed SVG faithfully encodes the snapshot.
+
+    Closes the whole 'another uncovered <text>' class (#50 verify R3): it compares the
+    COMPLETE ordered <text> content to a fresh render of the same snapshot — so the title,
+    BOTH column headers, every library / ecosystem / value-cell / sub-caption, AND the
+    footer are covered, and a fabricated extra row or a doctored sub-caption / header
+    changes the list. Version-independent: <text> STRINGS are stable across matplotlib
+    (only coordinates / bytes drift), so this never false-fails on a matplotlib bump.
+
+    Then, for the value cells only, it checks fill-COLOUR and column ORDER (x) so a
+    coordinate or colour swap that leaves the text intact still fails."""
+    committed = _svg_text_nodes(svg)
+    expected = _svg_text_nodes(chart.render_svg(SAMPLE))
+    # (1) every <text> string == the snapshot render — title / headers / cells / subs /
+    #     footer / no-extras. Catches stale, tampered, sub-caption lies, header swaps.
+    assert [n["text"] for n in committed] == [n["text"] for n in expected], \
+        "committed SVG text content diverged from the snapshot render (stale / tampered / extra row)"
+    # (2) value cells (body[i+2]=LiveDocs, body[i+4]=context7): a coord/colour swap keeps the
+    #     text but moves x / fill, so check colour == expected + column order (ld.x < c7.x).
+    cbody, ebody = committed[4:-1], expected[4:-1]
+    assert cbody and len(cbody) % 6 == 0, f"unexpected SVG <text> layout ({len(committed)} nodes)"
+    for i in range(0, len(cbody), 6):
+        lib = cbody[i]["text"]
+        ld, c7, eld, ec7 = cbody[i + 2], cbody[i + 4], ebody[i + 2], ebody[i + 4]
+        assert ld["fill"] == eld["fill"], f"{lib}: LiveDocs fill {ld['fill']} != {eld['fill']} (colour swap?)"
+        assert c7["fill"] == ec7["fill"], f"{lib}: context7 fill {c7['fill']} != {ec7['fill']} (colour swap?)"
+        assert ld["x"] is not None and c7["x"] is not None, f"{lib}: cell x missing"
+        assert ld["x"] < c7["x"], f"{lib}: columns swapped (LiveDocs x {ld['x']} !< context7 x {c7['x']})"
