@@ -199,4 +199,94 @@ final class EngineTests: XCTestCase {
         XCTAssertEqual(res?.version, "1.3.0", "must fall back to npm latest, not return not-found")
         XCTAssertEqual(res?.pinHonored, false)
     }
+
+    // ── #57: concurrent llms.txt candidate probing ────────────────────────────
+
+    func testParallelProbeSelectsByPreferenceOrderNotCompletionOrder() async {
+        // BOTH root llms.txt and /docs/llms.txt hit. The winner must be the root one
+        // (lower candidate index) — selection is by PREFERENCE order, never by which
+        // response happens to land first (#57 determinism contract).
+        let http = RecordingHTTP(routes: [
+            "https://ex.dev/llms.txt": textPlain(5_000),
+            "https://ex.dev/docs/llms.txt": textPlain(5_000),
+        ])
+        let sources = await DiscoveryEngine(http: http).resolveSources(.init(docsURL: "https://ex.dev"))
+        XCTAssertEqual(sources.first?.url, "https://ex.dev/llms.txt")
+        XCTAssertEqual(sources.first?.kind, .llmsIndex)
+    }
+
+    func testParallelProbeFiresAllCandidatesOfProbedHost() async {
+        // The parallel design's documented politeness trade (#57): ALL candidates of
+        // the ONE probed host are fired concurrently (sequential early-exit fired only
+        // the first). Bounded to that host's candidate set (4 here) — pin it.
+        let http = RecordingHTTP(routes: [
+            "https://ex.dev/llms.txt": textPlain(5_000),   // first candidate already hits
+        ])
+        _ = await DiscoveryEngine(http: http).resolveSources(.init(docsURL: "https://ex.dev"))
+        let probed = await http.requested.filter { $0.contains("llms") }
+        XCTAssertEqual(Set(probed), [
+            "https://ex.dev/llms.txt", "https://ex.dev/llms-full.txt",
+            "https://ex.dev/docs/llms.txt", "https://ex.dev/docs/llms-full.txt",
+        ], "all candidates of the probed host fire concurrently")
+    }
+
+    func testFullSiblingAbsorbedFromCollectedResultsNoReprobe() async {
+        // The llms-full "upgrade" must be satisfied from the already-collected
+        // concurrent results — the sibling is IN the candidate set, so it is fetched
+        // exactly once, never re-probed (#57).
+        let http = RecordingHTTP(routes: [
+            "https://hono.dev/llms.txt": textPlain(5_000),        // index-sized
+            "https://hono.dev/llms-full.txt": textPlain(40_000),  // full dump
+        ])
+        let sources = await DiscoveryEngine(http: http).resolveSources(.init(docsURL: "https://hono.dev"))
+        XCTAssertEqual(sources.first?.kind, .llmsFull)            // upgrade semantics preserved
+        XCTAssertTrue(sources.contains { $0.kind == .llmsIndex })
+        let fullFetches = await http.requested.filter { $0 == "https://hono.dev/llms-full.txt" }.count
+        XCTAssertEqual(fullFetches, 1, "sibling absorbed from collected results, not re-probed")
+    }
+
+    // ── #59: composite resolve+fetch-top in one call ──────────────────────────
+
+    func testResolveFetchingTopReturnsSourcesAndTopContent() async {
+        // One call yields the ranked list AND the top source's raw body — the
+        // round-trip the two-step resolve→fetch used to cost (#59).
+        let http = FakeHTTP(routes: [
+            "https://hono.dev/llms.txt": textPlain(5_000),
+            "https://hono.dev/llms-full.txt": textPlain(40_000),
+        ])
+        let (sources, top) = await DiscoveryEngine(http: http)
+            .resolveSourcesFetchingTop(.init(docsURL: "https://hono.dev"))
+        XCTAssertEqual(sources.first?.kind, .llmsFull)
+        XCTAssertEqual(top?.count, 40_000, "top content is the top-ranked source's body, verbatim")
+    }
+
+    func testResolveFetchingTopEmptyResolveYieldsNilContent() async {
+        // Nothing resolves → no fetch attempted, content nil, sources empty —
+        // graceful degradation, never an error for the have-nothing case.
+        let (sources, top) = await DiscoveryEngine(http: FakeHTTP(routes: [:]))
+            .resolveSourcesFetchingTop(.init(docsURL: "https://nothing.example"))
+        XCTAssertTrue(sources.isEmpty)
+        XCTAssertNil(top)
+    }
+}
+
+/// Concurrency-safe recording fake: an actor, so concurrent TaskGroup probes (#57)
+/// can log requests without data races.
+private actor RequestLog {
+    var urls: [String] = []
+    func add(_ u: String) { urls.append(u) }
+}
+
+private struct RecordingHTTP: HTTPClient {
+    let routes: [String: HTTPResponse]
+    let log = RequestLog()
+    var requested: [String] { get async { await log.urls } }
+    func get(_ url: String, headers: [String: String]) async throws -> HTTPResponse {
+        await log.add(url)
+        return routes[url] ?? HTTPResponse(status: 404, contentType: "text/html", body: Data("nf".utf8))
+    }
+    func post(_ url: String, body: Data, headers: [String: String]) async throws -> HTTPResponse {
+        await log.add(url)
+        return routes[url] ?? HTTPResponse(status: 404, contentType: "text/html", body: Data("nf".utf8))
+    }
 }

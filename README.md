@@ -70,7 +70,7 @@ defeating gzip bombs), and returned text is stripped of control / ANSI / bidi ch
 
 | Tool | Purpose |
 |------|---------|
-| `resolve_source` | Ranked primary sources for a library (`library`+`ecosystem` and/or `docs_url`). |
+| `resolve_source` | Ranked primary sources for a library (`library`+`ecosystem` and/or `docs_url`). `fetch_top:true` also returns the top result's raw content in the same call (one round-trip instead of resolve→fetch). |
 | `fetch_docs` | Raw verbatim text of a source URL. |
 | `latest_version` | Latest released version + changelog/repo, from the registry (9 ecosystems; version pinning on npm/pypi/crates/go/rubygems with a `pin_honored` signal). |
 | `introspect` | OpenAPI / GraphQL schema, an installed CLI's `--help`, an installed R package's version (`kind:"r-pkg"`), or the effective language-runtime version of the current project (`kind:"runtime"`, Python/Node/Go/Rust/Java/.NET/Swift/R; `javascript` aliases to node). Read-only. |
@@ -121,7 +121,7 @@ python3 evals/look-up/compare_context7.py --check-staleness  # exit 1 if the sna
 
 See [`evals/look-up/README.md`](evals/look-up/README.md) for the design of both, and
 the [Testing wiki page](https://github.com/PsychQuant/livedocs/wiki/Testing) for the full
-suite breakdown (216 tests: 144 Swift + 72 Python).
+suite breakdown (225 tests: 153 Swift + 72 Python).
 
 Status: shipped (v0.8.0; engine features below shipped v0.7.0, the skill's `look-up` rename +
 explicit invocation landed in v0.8.0). 9-ecosystem registry resolution, version pinning (npm/pypi/crates/go/rubygems), OpenAPI/GraphQL/CLI +

@@ -2,23 +2,23 @@
 
 # Testing
 
-LiveDocs has two independent test suites — **216 tests, all green**. The Swift suite verifies
+LiveDocs has two independent test suites — **225 tests, all green**. The Swift suite verifies
 the engine; the Python suite verifies that the `look-up` *skill* actually triggers a
 LiveDocs query and answers currently, plus the vs-context7 comparison harness. Counts below
 are a snapshot; the source of truth is running the suites.
 
 ```bash
-swift test                                  # 144 Swift tests
+swift test                                  # 153 Swift tests
 python3 -m pytest evals/look-up/tests/  # 72 Python eval tests
 ```
 
-## Swift — 144 tests (`swift test`)
+## Swift — 153 tests (`swift test`)
 
 Split along the pure-core / MCP-shell architecture. `LiveDocsCore` is dependency-free and
 tested without a network (HTTP is injected as a fake); `CheLiveDocsMCP` covers the process
 and file-system layer.
 
-### `LiveDocsCoreTests` — 115 (pure logic)
+### `LiveDocsCoreTests` — 123 (pure logic)
 
 | File | Tests | Covers |
 |------|------:|--------|
@@ -29,21 +29,22 @@ and file-system layer.
 | `LLMSTxtTests` | 6 | `llms.txt` candidate ordering, soft-404 content-type guard, index/full flavor split. |
 | `IntrospectionTests` | 6 | OpenAPI / GraphQL schema parsing (method allowlist, shape-only, deterministic ordering). |
 | `RIntrospectionTests` | 6 | Installed-R-package version parsing + safe-name validation. |
-| `EngineTests` | 12 | Discovery chain over injected HTTP fakes (registry → llms.txt → repo), non-npm/pypi version-pin honoring (`pin_honored` true/false/nil), the latest-only-ecosystem engine path setting `pin_honored=false`, and auto-detect's two-pass pin resolution (fall through npm→PyPI for an exact pin, then fall back to npm latest+false when the pin exists nowhere). |
-| `ETagCacheTests` | 5 | ETag revalidation semantics (304 → cached, 200 → refresh, never blind-stale, POST never cached). |
+| `EngineTests` | 17 | Discovery chain over injected HTTP fakes (registry → llms.txt → repo), non-npm/pypi version-pin honoring (`pin_honored` true/false/nil), the latest-only-ecosystem engine path setting `pin_honored=false`, and auto-detect's two-pass pin resolution (fall through npm→PyPI for an exact pin, then fall back to npm latest+false when the pin exists nowhere), #57 parallel llms probing (preference-order determinism, all-candidates-fired pin, full-sibling absorbed without re-probe), and #59 composite resolve+fetch-top (one call returns list + content; empty resolve degrades gracefully). |
+| `ETagCacheTests` | 8 | ETag revalidation semantics (304 → cached, 200 → refresh, never blind-stale, POST never cached), and #58 disk persistence (304 roundtrip across restart, corrupt file starts empty + self-heals, oversized bodies stay memory-only + nil-URL zero side effects). |
 | `RegistryTests` | 5 | Per-ecosystem registry resolution + version pinning. |
 | `ClassificationTests` | 4 | Soft-404 hit/miss classification. |
 | `ETagCacheLRUTests` | 4 | Cache bounding (LRU eviction, byte budget, oversized-entry refusal). |
 | `ValidationTests` | 4 | Boundary validation (package/version strings can't inject URL structure). |
 | `RankingTests` | 2 | Fidelity-then-freshness ranking with a stable tiebreak. |
 
-### `CheLiveDocsMCPTests` — 29 (process / file layer)
+### `CheLiveDocsMCPTests` — 30 (process / file layer)
 
 | File | Tests | Covers |
 |------|------:|--------|
 | `RuntimeIntrospectTests` | 11 | Symlink version-file refusal (secret-exfil guard), uncovered-language fallback to the universal pin layer, canonical `mise.toml`, PATH-first executable resolution, uppercase-id acceptance with requested-id preservation (R / JavaScript), javascript↔node resolution equivalence. |
 | `ProcessRunnerTests` | 4 | Large output doesn't deadlock (concurrent pipe drain), exit code surfaces, timeout reported, SIGTERM→SIGKILL escalation. |
 | `LatestVersionEncodingTests` | 14 | `latest_version` tool boundary: `pin_honored` true/false/nil surfacing (incl. `false` in the nothing-resolved path, and absent when no pin asked), the Go `v`-prefix confirmed-pin case (must not read as not-applied), v-prefixed input building a valid confirm URL, npm not-found → latest+false, npm dist-tag / exact-pin discrimination (a moving tag is never a faked pin), RubyGems end-to-end pin (honored + not-found). |
+| `ResolveSourceEncodingTests` | 1 | #59 composite response boundary: top_content{url,title,content} rides with the ranked list; a top-fetch miss degrades to an explicit note (pointing at the fetch_docs fallback) with the list intact. |
 
 ## Python — 72 tests (`pytest evals/look-up/`)
 

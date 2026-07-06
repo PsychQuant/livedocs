@@ -74,4 +74,66 @@ final class ETagCacheTests: XCTestCase {
         let r = try await client.post(url, jsonBody: "{}")
         XCTAssertEqual(r.bodyText, "POSTED")
     }
+
+    // ── #58: disk persistence (opt-in, small entries only) ────────────────────
+
+    private func tmpCacheURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("etag-test-\(UUID().uuidString)")
+            .appendingPathComponent("etag-cache.json")
+    }
+
+    func testPersistedEntrySurvivesRestart() async throws {
+        // Store A caches a 200; a NEW store on the same file (fresh "process") must
+        // revalidate with If-None-Match and serve the persisted body on 304 — the
+        // revalidation share of the warm win survives restart (#58).
+        let file = tmpCacheURL()
+        let a = ETagCacheStore(persistURL: file)
+        _ = try await ETagCachingHTTPClient(inner: FakeInner(etag: "v1", body: "content-1"), store: a).get(url)
+
+        let log = CallLog()
+        let b = ETagCacheStore(persistURL: file)             // fresh store, same file
+        let second = try await ETagCachingHTTPClient(
+            inner: FakeInner(etag: "v1", body: "SHOULD-NOT-REDOWNLOAD", log: log), store: b).get(url)
+        XCTAssertEqual(second.status, 200)
+        XCTAssertEqual(second.bodyText, "content-1", "304 must serve the DISK-loaded body")
+        let hits = await log.count
+        XCTAssertEqual(hits, 1, "still exactly one revalidation round-trip — never blind-stale")
+        // Owner-only from birth: the temp file is CREATED 0600 and rename(2)'d in,
+        // so there is never a world-readable window (#58 verify advisory).
+        let perms = try XCTUnwrap(
+            FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int)
+        XCTAssertEqual(perms & 0o777, 0o600)
+    }
+
+    func testCorruptCacheFileStartsEmptyAndRecovers() async throws {
+        // A corrupt/garbage file must NEVER crash: start empty, work normally, and
+        // rewrite the file on the next cache write (#58 robustness).
+        let file = tmpCacheURL()
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("not json {{{".utf8).write(to: file)
+        let store = ETagCacheStore(persistURL: file)
+        let r = try await ETagCachingHTTPClient(inner: FakeInner(etag: "v1", body: "fresh"), store: store).get(url)
+        XCTAssertEqual(r.bodyText, "fresh")
+        let reloaded = ETagCacheStore(persistURL: file)      // file was rewritten valid
+        let hit = try await ETagCachingHTTPClient(inner: FakeInner(etag: "v1", body: "X"), store: reloaded).get(url)
+        XCTAssertEqual(hit.bodyText, "fresh", "rewritten file loads cleanly after corruption")
+    }
+
+    func testOversizedBodyNotPersistedAndNilURLWritesNothing() async throws {
+        // Bodies over the persist cap stay in-memory only (a fresh store re-downloads);
+        // and the nil-persistURL default has zero file side effects (#58 scope).
+        let file = tmpCacheURL()
+        let big = String(repeating: "x", count: 1_500_000)   // > 1 MB persist cap, < 5 MB memory cap
+        let a = ETagCacheStore(persistURL: file)
+        _ = try await ETagCachingHTTPClient(inner: FakeInner(etag: "v1", body: big), store: a).get(url)
+        let b = ETagCacheStore(persistURL: file)
+        let refetched = try await ETagCachingHTTPClient(inner: FakeInner(etag: "v2", body: "fresh-dl"), store: b).get(url)
+        XCTAssertEqual(refetched.bodyText, "fresh-dl", "oversized body must not come from disk")
+
+        let noFile = tmpCacheURL()
+        let c = ETagCacheStore()                              // default: in-memory only
+        _ = try await ETagCachingHTTPClient(inner: FakeInner(etag: "v1", body: "mem"), store: c).get(url)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: noFile.path))
+    }
 }
