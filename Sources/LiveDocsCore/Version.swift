@@ -9,7 +9,7 @@ import Foundation
 /// cross-checks this constant against the git tag.
 public enum LiveDocsVersion {
     /// The current package version. Keep in lockstep with the latest git tag and
-    /// the plugin/marketplace/mcpb manifests (release.sh enforces the tag match).
+    /// the plugin/mcpb manifests (release.sh enforces the tag match).
     public static let current = "0.9.0"
 
     /// Canonical repository slug — used to build the User-Agent and any self-links.

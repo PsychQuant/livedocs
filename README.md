@@ -17,20 +17,30 @@ It can reach raw primary content and the exact latest version, which a pre-built
 Two slash commands in Claude Code:
 
 ```
-/plugin marketplace add PsychQuant/livedocs
-/plugin install livedocs@livedocs-marketplace
+/plugin marketplace add PsychQuant/claude-code-logos
+/plugin install livedocs@claude-code-logos
 ```
+
+**Moved (2026-11):** the plugin is now installed from the [`claude-code-logos`](https://github.com/PsychQuant/claude-code-logos) marketplace, which includes this repository as a git submodule pinned to a release tag. This repository no longer holds a marketplace of its own. If you installed `livedocs@livedocs-marketplace`, switch once:
+
+```
+/plugin marketplace remove livedocs-marketplace
+/plugin marketplace add PsychQuant/claude-code-logos
+/plugin install livedocs@claude-code-logos
+```
+
+Removing the old marketplace also uninstalls the copy that came from it. macOS only; the plugin's wrapper downloads the MCP server binary from this repository's GitHub Releases.
 
 **Or just paste this to your AI and it'll set it up for you:**
 
 ```
-Install the "livedocs" Claude Code plugin from https://github.com/PsychQuant/livedocs.
-Run  /plugin marketplace add PsychQuant/livedocs  then  /plugin install livedocs@livedocs-marketplace
+Install the "livedocs" Claude Code plugin (source: https://github.com/PsychQuant/livedocs).
+Run  /plugin marketplace add PsychQuant/claude-code-logos  then  /plugin install livedocs@claude-code-logos
 ```
 
 After installing, just ask your usual documentation/version questions — the bundled
 `look-up` skill routes each one to the right tool automatically. (LiveDocs is a network-only
-plugin; its MCP server is signed + notarized and distributed through the marketplace.)
+plugin; its MCP server is signed + notarized and distributed through the `claude-code-logos` marketplace.)
 
 ## Why this exists
 
