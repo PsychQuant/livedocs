@@ -23,9 +23,19 @@ context7 是以覆蓋率排序、週期性重爬的索引; LiveDocs 直接抓 li
 ## 安裝
 
 ```
-/plugin marketplace add PsychQuant/livedocs
-/plugin install livedocs@livedocs-marketplace
+/plugin marketplace add PsychQuant/claude-code-logos
+/plugin install livedocs@claude-code-logos
 ```
+
+**已搬移（2026-11）：**這個 plugin 改由 [`claude-code-logos`](https://github.com/PsychQuant/claude-code-logos) marketplace 安裝；它把本 repo 當成 git submodule，釘在 release tag。本 repo 不再有自己的 marketplace。已經裝過 `livedocs@livedocs-marketplace` 的話，換一次：
+
+```
+/plugin marketplace remove livedocs-marketplace
+/plugin marketplace add PsychQuant/claude-code-logos
+/plugin install livedocs@claude-code-logos
+```
+
+移除舊的 marketplace 會連同它裝的那一份一起卸載。
 
 之後用 `look-up` skill, 它會把問題路由到對的工具。
 

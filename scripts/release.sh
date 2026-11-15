@@ -108,8 +108,8 @@ if [[ "$SRC_VERSION" != "$VERSION_NO_V" ]]; then
         Update Sources/LiveDocsCore/Version.swift to match the tag before releasing."
 fi
 
-# Manifests must match too (mcpb / plugin / marketplace).
-for mf in mcpb/manifest.json plugins/livedocs/.claude-plugin/plugin.json .claude-plugin/marketplace.json; do
+# Manifests must match too (mcpb / plugin).
+for mf in mcpb/manifest.json plugins/livedocs/.claude-plugin/plugin.json; do
     if [[ -f "$mf" ]] && ! grep -q "\"$VERSION_NO_V\"" "$mf"; then
         die "$mf does not reference version $VERSION_NO_V. bump it before releasing."
     fi
@@ -267,6 +267,7 @@ echo
 echo "View at: https://github.com/$REPO/releases/tag/$VERSION"
 echo
 echo "Next steps:"
-echo "    - Update marketplace.json version in psychquant-claude-plugins"
-echo "    - /plugin marketplace update psychquant-claude-plugins"
-echo "    - /plugin update che-livedocs-mcp@psychquant-claude-plugins"
+echo "    - In PsychQuant/claude-code-logos, move the plugins/livedocs submodule to this tag:"
+echo "        git -C plugins/livedocs fetch --tags && git -C plugins/livedocs checkout $VERSION"
+echo "        git add plugins/livedocs && git commit   (then push; its tests check the pin)"
+echo "    - Users: /plugin marketplace update claude-code-logos, then /plugin update livedocs@claude-code-logos"
