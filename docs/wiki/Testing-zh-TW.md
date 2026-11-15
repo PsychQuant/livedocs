@@ -48,7 +48,7 @@ python3 -m pytest evals/look-up/tests/  # 72 個 Python eval test
 
 `look-up` **skill eval harness** —— 不是測 Swift 引擎,而是測 skill 對多種 prompt 會不會
 激起 LiveDocs 查詢並答對現行 —— 外加 vs-context7 比較 harness。見
-[`evals/look-up/README.md`](https://github.com/PsychQuant/livedocs/blob/main/evals/look-up/README.md)。
+[`evals/look-up/README.md`](https://github.com/PsychQuantAgent/livedocs/blob/main/evals/look-up/README.md)。
 
 | 檔案 | 數 | 測什麼 |
 |------|---:|--------|

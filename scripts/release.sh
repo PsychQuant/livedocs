@@ -24,7 +24,7 @@ set -euo pipefail
 
 # ---- Config ------------------------------------------------------------------
 
-REPO="PsychQuant/livedocs"
+REPO="PsychQuantAgent/livedocs"
 BINARY_NAME="CheLiveDocsMCP"
 # Distribution artifact: a signed + notarized UNIVERSAL (arm64 + x86_64) binary,
 # lipo'd into a dedicated dist dir so the per-arch .build trees stay untouched.
@@ -267,7 +267,7 @@ echo
 echo "View at: https://github.com/$REPO/releases/tag/$VERSION"
 echo
 echo "Next steps:"
-echo "    - In PsychQuant/claude-code-logos, move the plugins/livedocs submodule to this tag:"
+echo "    - In PsychQuantAgent/claude-code-logos, move the plugins/livedocs submodule to this tag:"
 echo "        git -C plugins/livedocs fetch --tags && git -C plugins/livedocs checkout $VERSION"
 echo "        git add plugins/livedocs && git commit   (then push; its tests check the pin)"
 echo "    - Users: /plugin marketplace update claude-code-logos, then /plugin update livedocs@claude-code-logos"

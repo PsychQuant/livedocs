@@ -32,21 +32,21 @@ index's hardest case, not a neutral sample. LiveDocs' side is the registry by co
 (it fetches it live), so the finding here is really about context7's default-match staleness.
 context7 wins on doc/snippet breadth (not measured here) and can carry the current version
 in a *lower-ranked* entry (react, in this sample). Method + per-library data:
-[`evals/look-up`](https://github.com/PsychQuant/livedocs/tree/main/evals/look-up).
-Deeper positioning: [vs context7](https://github.com/PsychQuant/livedocs/blob/main/docs/positioning.md).
+[`evals/look-up`](https://github.com/PsychQuantAgent/livedocs/tree/main/evals/look-up).
+Deeper positioning: [vs context7](https://github.com/PsychQuantAgent/livedocs/blob/main/docs/positioning.md).
 
 ## Install
 
 ```
-/plugin marketplace add PsychQuant/claude-code-logos
+/plugin marketplace add PsychQuantAgent/claude-code-logos
 /plugin install livedocs@claude-code-logos
 ```
 
-**Moved (2026-11):** the plugin is now installed from the [`claude-code-logos`](https://github.com/PsychQuant/claude-code-logos) marketplace, which includes this repository as a git submodule pinned to a release tag. This repository no longer holds a marketplace of its own. If you installed `livedocs@livedocs-marketplace`, switch once:
+**Moved (2026-11):** the plugin is now installed from the [`claude-code-logos`](https://github.com/PsychQuantAgent/claude-code-logos) marketplace, which includes this repository as a git submodule pinned to a release tag. This repository no longer holds a marketplace of its own. If you installed `livedocs@livedocs-marketplace`, switch once:
 
 ```
 /plugin marketplace remove livedocs-marketplace
-/plugin marketplace add PsychQuant/claude-code-logos
+/plugin marketplace add PsychQuantAgent/claude-code-logos
 /plugin install livedocs@claude-code-logos
 ```
 
@@ -71,5 +71,5 @@ Then use the `look-up` skill; it routes questions to the right tool.
 
 ## More
 
-- [Positioning, vs context7](https://github.com/PsychQuant/livedocs/blob/main/docs/positioning.md)
-- [CHANGELOG](https://github.com/PsychQuant/livedocs/blob/main/CHANGELOG.md)
+- [Positioning, vs context7](https://github.com/PsychQuantAgent/livedocs/blob/main/docs/positioning.md)
+- [CHANGELOG](https://github.com/PsychQuantAgent/livedocs/blob/main/CHANGELOG.md)

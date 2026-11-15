@@ -13,7 +13,7 @@ public enum LiveDocsVersion {
     public static let current = "0.9.0"
 
     /// Canonical repository slug — used to build the User-Agent and any self-links.
-    public static let repositorySlug = "PsychQuant/livedocs"
+    public static let repositorySlug = "PsychQuantAgent/livedocs"
 
     /// The HTTP `User-Agent` sent on every request. A real UA avoids 403s from
     /// hosts that reject empty/robot agents; the version comes from `current`

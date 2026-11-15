@@ -51,7 +51,7 @@ and file-system layer.
 The `look-up` **skill eval harness** — not a test of the Swift engine, but of whether
 the skill fires a LiveDocs query for varied prompts and answers currently — plus the
 vs-context7 comparison harness. See
-[`evals/look-up/README.md`](https://github.com/PsychQuant/livedocs/blob/main/evals/look-up/README.md).
+[`evals/look-up/README.md`](https://github.com/PsychQuantAgent/livedocs/blob/main/evals/look-up/README.md).
 
 | File | Tests | Covers |
 |------|------:|--------|

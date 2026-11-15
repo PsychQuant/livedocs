@@ -21,22 +21,22 @@ exact latest version and the API contract itself, which a lossy index can't.
 ## Install
 
 ```
-/plugin marketplace add PsychQuant/claude-code-logos
+/plugin marketplace add PsychQuantAgent/claude-code-logos
 /plugin install livedocs@claude-code-logos
 ```
 
-**Moved (2026-11):** the plugin is now installed from the [`claude-code-logos`](https://github.com/PsychQuant/claude-code-logos) marketplace, which includes this repository as a git submodule pinned to a release tag. This repository no longer holds a marketplace of its own. If you installed `livedocs@livedocs-marketplace`, switch once:
+**Moved (2026-11):** the plugin is now installed from the [`claude-code-logos`](https://github.com/PsychQuantAgent/claude-code-logos) marketplace, which includes this repository as a git submodule pinned to a release tag. This repository no longer holds a marketplace of its own. If you installed `livedocs@livedocs-marketplace`, switch once:
 
 ```
 /plugin marketplace remove livedocs-marketplace
-/plugin marketplace add PsychQuant/claude-code-logos
+/plugin marketplace add PsychQuantAgent/claude-code-logos
 /plugin install livedocs@claude-code-logos
 ```
 
 Removing the old marketplace also uninstalls the copy that came from it. macOS only; the plugin's wrapper downloads the MCP server binary from this repository's GitHub Releases.
 
 The `bin/livedocs-wrapper.sh` auto-downloads the signed `CheLiveDocsMCP` binary
-from the [`PsychQuant/livedocs`](https://github.com/PsychQuant/livedocs) release
+from the [`PsychQuantAgent/livedocs`](https://github.com/PsychQuantAgent/livedocs) release
 matching `plugin.json`'s `binary_version`, and keeps it current on plugin updates.
 
-Binary source + engine internals: `PsychQuant/livedocs` (`~/Developer/che-mcps/livedocs`).
+Binary source + engine internals: `PsychQuantAgent/livedocs` (`~/Developer/che-mcps/livedocs`).

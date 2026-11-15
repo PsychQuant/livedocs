@@ -3,7 +3,7 @@
 # docs/wiki/ is the source of truth (version-controlled, PR-reviewed); the wiki is a
 # generated copy. Run this after editing anything under docs/wiki/.
 set -euo pipefail
-REPO="PsychQuant/livedocs"
+REPO="PsychQuantAgent/livedocs"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC="$ROOT/docs/wiki"
 TMP="$(mktemp -d)"

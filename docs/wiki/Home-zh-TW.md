@@ -18,20 +18,20 @@ context7 是以覆蓋率排序、週期性重爬的索引; LiveDocs 直接抓 li
 | 來源 | live registry / primary docs | 週期性重爬的索引 |
 
 誠實範圍:只量**新鮮度**, 且刻意挑「快速更新」的 library —— 這是重爬索引最吃虧的情境, 不是中立取樣。LiveDocs 那一側 by construction 就是 registry(它即時抓), 所以這裡真正的發現是 context7 預設匹配的過時程度。context7 的主場是文件 / snippet 廣度(這裡不量), 而當前版本有時存在於某個 lower-ranked 條目裡(本 sample 中 react 如此)。方法與逐 library 數據:
-[`evals/look-up`](https://github.com/PsychQuant/livedocs/tree/main/evals/look-up)。更深的定位:[對 context7](https://github.com/PsychQuant/livedocs/blob/main/docs/positioning.md)。
+[`evals/look-up`](https://github.com/PsychQuantAgent/livedocs/tree/main/evals/look-up)。更深的定位:[對 context7](https://github.com/PsychQuantAgent/livedocs/blob/main/docs/positioning.md)。
 
 ## 安裝
 
 ```
-/plugin marketplace add PsychQuant/claude-code-logos
+/plugin marketplace add PsychQuantAgent/claude-code-logos
 /plugin install livedocs@claude-code-logos
 ```
 
-**已搬移（2026-11）：**這個 plugin 改由 [`claude-code-logos`](https://github.com/PsychQuant/claude-code-logos) marketplace 安裝；它把本 repo 當成 git submodule，釘在 release tag。本 repo 不再有自己的 marketplace。已經裝過 `livedocs@livedocs-marketplace` 的話，換一次：
+**已搬移（2026-11）：**這個 plugin 改由 [`claude-code-logos`](https://github.com/PsychQuantAgent/claude-code-logos) marketplace 安裝；它把本 repo 當成 git submodule，釘在 release tag。本 repo 不再有自己的 marketplace。已經裝過 `livedocs@livedocs-marketplace` 的話，換一次：
 
 ```
 /plugin marketplace remove livedocs-marketplace
-/plugin marketplace add PsychQuant/claude-code-logos
+/plugin marketplace add PsychQuantAgent/claude-code-logos
 /plugin install livedocs@claude-code-logos
 ```
 
@@ -56,5 +56,5 @@ context7 是以覆蓋率排序、週期性重爬的索引; LiveDocs 直接抓 li
 
 ## 其他
 
-- [定位, 對 context7](https://github.com/PsychQuant/livedocs/blob/main/docs/positioning.md)
-- [CHANGELOG](https://github.com/PsychQuant/livedocs/blob/main/CHANGELOG.md)
+- [定位, 對 context7](https://github.com/PsychQuantAgent/livedocs/blob/main/docs/positioning.md)
+- [CHANGELOG](https://github.com/PsychQuantAgent/livedocs/blob/main/CHANGELOG.md)

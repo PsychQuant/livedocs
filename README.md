@@ -3,7 +3,7 @@
 <!-- BEGIN vs-context7 (generated: compare_context7.py --emit-readme --write — do not hand-edit) -->
 ![Per-library latest-version freshness on 6 fast-moving libraries: LiveDocs returns the current release on 6/6; context7's default match on 0/6 (freshness only, context7 wins on coverage).](docs/assets/vs-context7-freshness.svg)
 
-_**Latest-version freshness**, 6 fast-moving libraries · captured 2026-07-02 · **measured, not asserted**: freshness of the *default match* only — context7 wins on doc coverage and can carry the current version in a lower-ranked entry (as with react here; both conceded, not measured), the libraries are forward-selected fast-movers, and LiveDocs is the registry by construction. Data + method: [`evals/look-up`](https://github.com/PsychQuant/livedocs/tree/main/evals/look-up)._
+_**Latest-version freshness**, 6 fast-moving libraries · captured 2026-07-02 · **measured, not asserted**: freshness of the *default match* only — context7 wins on doc coverage and can carry the current version in a lower-ranked entry (as with react here; both conceded, not measured), the libraries are forward-selected fast-movers, and LiveDocs is the registry by construction. Data + method: [`evals/look-up`](https://github.com/PsychQuantAgent/livedocs/tree/main/evals/look-up)._
 <!-- END vs-context7 -->
 
 A **Claude Code plugin** for primary-source-first, always-latest documentation.
@@ -17,15 +17,15 @@ It can reach raw primary content and the exact latest version, which a pre-built
 Two slash commands in Claude Code:
 
 ```
-/plugin marketplace add PsychQuant/claude-code-logos
+/plugin marketplace add PsychQuantAgent/claude-code-logos
 /plugin install livedocs@claude-code-logos
 ```
 
-**Moved (2026-11):** the plugin is now installed from the [`claude-code-logos`](https://github.com/PsychQuant/claude-code-logos) marketplace, which includes this repository as a git submodule pinned to a release tag. This repository no longer holds a marketplace of its own. If you installed `livedocs@livedocs-marketplace`, switch once:
+**Moved (2026-11):** the plugin is now installed from the [`claude-code-logos`](https://github.com/PsychQuantAgent/claude-code-logos) marketplace, which includes this repository as a git submodule pinned to a release tag. This repository no longer holds a marketplace of its own. If you installed `livedocs@livedocs-marketplace`, switch once:
 
 ```
 /plugin marketplace remove livedocs-marketplace
-/plugin marketplace add PsychQuant/claude-code-logos
+/plugin marketplace add PsychQuantAgent/claude-code-logos
 /plugin install livedocs@claude-code-logos
 ```
 
@@ -34,8 +34,8 @@ Removing the old marketplace also uninstalls the copy that came from it. macOS o
 **Or just paste this to your AI and it'll set it up for you:**
 
 ```
-Install the "livedocs" Claude Code plugin (source: https://github.com/PsychQuant/livedocs).
-Run  /plugin marketplace add PsychQuant/claude-code-logos  then  /plugin install livedocs@claude-code-logos
+Install the "livedocs" Claude Code plugin (source: https://github.com/PsychQuantAgent/livedocs).
+Run  /plugin marketplace add PsychQuantAgent/claude-code-logos  then  /plugin install livedocs@claude-code-logos
 ```
 
 After installing, just ask your usual documentation/version questions — the bundled
@@ -130,7 +130,7 @@ python3 evals/look-up/compare_context7.py --check-staleness  # exit 1 if the sna
 ```
 
 See [`evals/look-up/README.md`](evals/look-up/README.md) for the design of both, and
-the [Testing wiki page](https://github.com/PsychQuant/livedocs/wiki/Testing) for the full
+the [Testing wiki page](https://github.com/PsychQuantAgent/livedocs/wiki/Testing) for the full
 suite breakdown (225 tests: 153 Swift + 72 Python).
 
 Status: shipped (v0.8.0; engine features below shipped v0.7.0, the skill's `look-up` rename +
@@ -143,5 +143,5 @@ Signed+notarized release, marketplace distribution.
 
 Design boundary (what LiveDocs is and isn't for): [docs/wiki/Primary-Source-Spectrum.md](docs/wiki/Primary-Source-Spectrum.md).
 
-Wiki: <https://github.com/PsychQuant/livedocs/wiki>, mirrored 1:1 from `docs/wiki/` via `scripts/sync-wiki.sh` (edit `docs/wiki/`, then run the script).
+Wiki: <https://github.com/PsychQuantAgent/livedocs/wiki>, mirrored 1:1 from `docs/wiki/` via `scripts/sync-wiki.sh` (edit `docs/wiki/`, then run the script).
 Positioning (vs context7): [docs/positioning.md](docs/positioning.md).
