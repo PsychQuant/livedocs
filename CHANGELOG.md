@@ -2,7 +2,8 @@
 
 ## [Unreleased]
 
-- **Marketplace moved**: the plugin is now installed from the `claude-code-logos` marketplace (`/plugin marketplace add PsychQuant/claude-code-logos`, then `/plugin install livedocs@claude-code-logos`), which includes this repository as a git submodule pinned to a release tag. This repository's own marketplace file (`livedocs-marketplace`) is removed. Existing installs switch once: `/plugin marketplace remove livedocs-marketplace`, then the two commands above. After a release, `scripts/release.sh` now prints the step that moves the submodule in `claude-code-logos` to the new tag. No change to the plugin or the binary.
+- **Marketplace moved**: the plugin is now installed from the `claude-code-logos` marketplace (`/plugin marketplace add PsychQuantAgent/claude-code-logos`, then `/plugin install livedocs@claude-code-logos`), which includes this repository as a git submodule pinned to a release tag. This repository's own marketplace file (`livedocs-marketplace`) is removed. Existing installs switch once: `/plugin marketplace remove livedocs-marketplace`, then the two commands above. After a release, `scripts/release.sh` now prints the step that moves the submodule in `claude-code-logos` to the new tag. No change to the plugin or the binary.
+- **Repository moved**: this repository is now `PsychQuantAgent/livedocs` (was `PsychQuant/livedocs`). The wrapper's download source, the release and wiki scripts, the `.mcpb` manifest and the `User-Agent` slug name the new location; the old name redirects. Installed copies of the plugin get the wrapper change with the next release.
 
 ## [0.9.0]
 

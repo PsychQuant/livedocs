@@ -10,7 +10,7 @@
 
 set -u
 
-REPO="PsychQuant/livedocs"
+REPO="PsychQuantAgent/livedocs"
 BINARY_NAME="CheLiveDocsMCP"
 INSTALL_DIR="$HOME/bin"
 BINARY="$INSTALL_DIR/$BINARY_NAME"

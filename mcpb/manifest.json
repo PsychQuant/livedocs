@@ -11,10 +11,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/PsychQuant/livedocs.git"
+    "url": "https://github.com/PsychQuantAgent/livedocs.git"
   },
-  "homepage": "https://github.com/PsychQuant/livedocs",
-  "support": "https://github.com/PsychQuant/livedocs/issues",
+  "homepage": "https://github.com/PsychQuantAgent/livedocs",
+  "support": "https://github.com/PsychQuantAgent/livedocs/issues",
   "keywords": [
     "documentation",
     "llms-txt",

@@ -201,7 +201,7 @@ def render_readme_block(rows, captured_at):
         "**measured, not asserted**: freshness of the *default match* only — context7 wins on doc coverage "
         "and can carry the current version in a lower-ranked entry (as with react here; both conceded, not measured), "
         "the libraries are forward-selected fast-movers, and LiveDocs is the registry by construction. "
-        "Data + method: [`evals/look-up`](https://github.com/PsychQuant/livedocs/tree/main/evals/look-up)._",
+        "Data + method: [`evals/look-up`](https://github.com/PsychQuantAgent/livedocs/tree/main/evals/look-up)._",
         README_END,
     ])
 
